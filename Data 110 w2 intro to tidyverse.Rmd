@@ -1,0 +1,171 @@
+---
+title: "Week 2 Intro to Tidyverse"
+author: "Rachel Saidi"
+date: "August 19, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Load Data from Three Different Sources
+
+In the following notes, you will load data directly from a URL, directly from pre-build datasets in R, and finally from a file you save in your own folder.
+
+## Load Data from a URL 
+
+You can load data from a folder or you can load data directly from a URL. The next example loads the dataset, "Test Scores", directly from the URL where it resides. 
+
+```{r}
+# install.packages("tidyverse")
+getwd()
+library(tidyverse)
+allscores <- readr::read_csv("https://goo.gl/MJyzNs")
+dim(allscores)
+```
+
+Notice R interprets the variable "group" as continuous values (col_double). We will fix this later. The command "dim" provides the dimensions of the data, which are 22 observations (rows) by 4 variables (columns).
+
+## Use Side-by-Side Boxplots
+
+Here is some easy code to create 3 groups of boxplots with some easy-to-access data, filled by group. Since the groups are discrete, you can get rid of the shading.
+
+
+```{r}
+boxpl <- allscores %>% ggplot() + geom_boxplot(aes(y=diff, group=group,
+                                                fill=group))
+boxpl
+```
+
+Notice that the legend give a continuous range of values for the scores, even though the scores are only 1, 2, or 3. The code guides(fill = FALSE) will get rid of the legend. 
+
+```{r}
+boxpl2 <- boxpl + guides(fill=FALSE)
+boxpl2
+```
+
+
+Ensure that the groups are considered as factors, rather than numbers. Then manually fill with the 3 colors: white, light gray, and dark gray. Make the boxplots orient horizontally. 
+
+```{r}
+allscores %>%
+  mutate(group=factor(group, levels=c("1","2","3"), ordered=TRUE)) %>%
+  ggplot() + geom_boxplot(aes(y=diff, group=group, fill=group)) +
+  scale_fill_manual(values=c("white","lightgray","darkgray")) +
+  theme(axis.text.y=element_blank()) +
+  ggtitle("Score Improvements Across Three Groups") +
+  coord_flip()
+```
+
+
+## Load Built in Data from R
+
+
+Some data frames are built in to R, such as mpg. Load the data, then use str and head to look at the data.
+
+{r mpg} loads the data. Alternatively, you can use the command:
+load("mpg")
+
+You will look at the data using the command "str" (gives the structure of the data), "head" (lists the first 6 rows of observations in the dataset), and "describe" from the "psych" package (gives quite detailed summary statistics on the continuous variables).
+
+
+```{r mpg, warning = FALSE}  
+# {r mpg, warning = FALSE}  
+# install.packages("tidyverse")
+# install.packages("psych")
+library(tidyverse)
+library(psych)
+str(mpg)
+head(mpg)
+describe(mpg)
+```
+
+It is essential to recognize that variables may be: int (integer), num (numeric), or double vs char (character) and factor (for categories)
+
+Typically, chr or factor are used for discrete variables and
+int, dbl, or num for continuous variables.
+
+## Introducing ggplot2 and the grammar of graphics
+
+
+The "gg" in ggplot2 stands for "grammar of graphics," an approach to drawing charts devised by the statistician Leland Wilkinson. Rather than thinking in terms of finished charts like a scatter plot or a column chart, it starts by defining the coordinate system (usually the X and Y axes of a cartesian system), maps data onto those coordinates, and then adds layers such as points, bars and so on. This is the logic behind ggplot2 code.
+
+Some key things to understand about ggplot2:
+
+.	ggplot This is the master function that creates a ggplot2 chart.
+
+.	aes This function, named for "aesthetic mapping," is used whenever data values are mapped onto a chart. So it is used when you define which variables are plotted onto the X and Y axes, and also if you want to change the size or color of parts of the chart according to values for a variable.
+
+.	geom All of the functions that add layers to a chart start with geom, followed by an underscore, for example geom_point() or geom_bar(). The code in the brackets for any geom layer styles the items in that layer, and can include aes mappings of values from data.
+
+.	theme This function modifies the appearance of elements of a plot, used, for example, to set size and font face for text, the position of a legend, and so on.
+
+.	scale Functions that begin with scale, followed by an underscore, are used to modify the way an aes mapping of data appears on a chart. They can change the axis range, for example, or specify a color palette to be used to encode values in the data.
+
+.	+ is used each time you add a layer, a scale, a theme, or elements like axis labels and a title After a + you can continue on the same line of code or move the next line. I usually write a new line after each +, which makes the code easier to follow.
+
+
+## Now make a scatterplot using ggplot2
+
+Make a scatterplot of city vs highway miles per gallon, but sort/color points by either 4-wheel, front-wheel, or rear-wheel drive
+
+Here is how we will code:
+
+1. name the plot:  "plot1" <-
+
+2. call back the name of the dataset "mpg" and "pipe it" (more on that later) to create the frame for your plot
+
+3. call "ggplot" to make a set of axes, with the aesthetics (aes) for city and highway mpg, but color points by the factors for drv
+
+4. add geom_point to see the points
+
+5. call plot1 to see the entire plot
+
+
+```{r}
+plot1 <- mpg %>% ggplot(aes(cty, hwy, color = drv))+ 
+  geom_point()
+plot1
+```
+
+Notice that the blue points for rear-wheel drive are only at the lower left side of the plot (i.e., not great mpg). Red points for 4-wheel drive have a wider spread of points, but they are also mainly at the lower left corner of the plot. The green points for front-wheel drive are mostly at the upper right, for the higher mpg.
+
+
+## Add a title and labels
+
+Although there are already axes labels, we can do better. We should also add a title
+
+```{r}
+plot1 <- mpg %>% ggplot(aes(cty, hwy, color = drv))+ 
+  geom_point()+
+  xlab("City miles per gallon") +
+  ylab("Highway miles per gallon") +
+  ggtitle("Scatterplot of City versus Highway Miles per Gallon")
+plot1
+```
+
+
+## Clean data headings and variable names
+
+Very soon, you will find data from other sources. The data will require some cleaning. Here are some important points to check:
+1. Be sure the format is .csv
+2. Be sure there are no spaces between variable names (headers).
+3. Set all variable names to lowercase so you do not have to keep track of capitalizing.
+
+
+Download this dataset, Household_debt, from http://bit.ly/2P3084E and save it in your dataset folder. Change your working directory to load the dataset from YOUR folder. Then run this code. 
+
+```{r}
+setwd("C:/Users/rsaidi/Dropbox/Rachel/MontColl/Datasets/Datasets")
+household <- read_csv("household_debt.csv")
+```
+
+### Make all headings (column names) lowercase. Then remove all spaces between words in headings and replace them with underscores. Then look at it with "head".
+
+```{r}
+names(household) <- tolower(names(household))
+names(household) <- gsub(" ","_",names(household))
+head(household)
+```

@@ -1,0 +1,112 @@
+---
+title: "Week 2 Homework airquality"
+author: "Rachel Saidi"
+date: "July 31, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load in the Dataset. 
+
+Because airquality is a pre-built dataset, we can write it to our data directory to store it for later use.
+
+```{r include = FALSE }
+library(tidyverse)
+datasets::airquality
+setwd("C:/Users/rsaidi/Dropbox/Rachel/MontColl/Datasets/Datasets")
+write_csv(airquality, "airquality.csv")
+```
+
+# Look at the structure of the data
+
+```{r}
+str(airquality)
+```
+
+# Change the Months from 5 - 9 to May through September
+
+```{r}
+airquality$Month[airquality$Month == 5]<- "May"
+airquality$Month[airquality$Month == 6]<- "June"
+airquality$Month[airquality$Month == 7]<- "July"
+airquality$Month[airquality$Month == 8]<- "August"
+airquality$Month[airquality$Month == 9]<- "September"
+```
+
+
+# Look at the summary statistics of the dataset
+
+```{r}
+str(airquality)
+summary(airquality)
+```
+
+If you want to look at specific statistics, here are some variations on coding
+
+```{r}
+mean(airquality$Temp)
+mean(airquality[,4])
+median(airquality$Temp)
+var(airquality$Wind)
+```
+
+# Reorder the Months so they do not default to alphabetical
+
+```{r}
+airquality$Month<-factor(airquality$Month, levels=c("May", "June","July", "August", "September"))
+```
+
+
+
+#   Plot 1:  Create a histogram categorized by Month with qplot
+
+```{r}
+p1 <- qplot(data = airquality,Temp,fill = Month,geom = "histogram", bins = 20)
+p1
+```
+
+# Plot 2: Make a histogram using ggplot (instead of qplot)
+
+Reorder the legend so that it is not the default (alphabetical), but rather in order that months come
+
+```{r}
+p2 <- airquality %>%
+  ggplot(aes(x=Temp, fill=Month)) +
+  geom_histogram(position="identity", alpha=0.5, binwidth = 5, color = "white")+
+  scale_fill_discrete(name = "Month", labels = c("May", "June","July", "August", "September"))
+p2
+```
+
+
+# Plot 3: Create side-by-side boxplots categorized by Month
+
+```{r}
+p3 <- airquality %>%
+  ggplot(aes(Month, Temp, fill = Month)) + 
+  ggtitle("Temperatures") +
+  xlab("Months") +
+  ylab("Frequency") +
+  geom_boxplot() +
+  scale_fill_discrete(name = "Month", labels = c("May", "June","July", "August", "September"))
+p3 
+```
+
+
+# Plot 4: Make the same side-by-side boxplots, but in grey-scale
+
+```{r}
+p4 <- airquality %>%
+  ggplot(aes(Month, Temp, fill = Month)) + 
+  ggtitle("Temperatures") +
+  xlab("Temperatures") +
+  ylab("Frequency") +
+  geom_boxplot()+
+  scale_fill_grey(name = "Month", labels = c("May", "June","July", "August", "September"))
+p4
+```
+
+
+
