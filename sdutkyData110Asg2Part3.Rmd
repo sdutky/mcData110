@@ -1,0 +1,123 @@
+---
+title: "DATA 110 Week 2 Homework airquality plots"
+author: "Steve Dutky"
+date: "September 14, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load Airquality dataset included with tidyverse
+```{r}
+library(tidyverse)
+airquality<- datasets::airquality
+```
+## see what the included airquality dataset looks like:
+
+```{r}
+# structure
+str(airquality)
+```
+
+```{r}
+#
+# variety
+summary(airquality)
+```
+
+## remap months from integers to names
+```{r}
+airquality$Month<-as.factor(airquality$Month)
+levels(airquality$Month)=c("May","Jun","Jul","Aug","Sep")
+```
+
+# Plot 1: Create a histogram categorized by Month with qplot
+```{r}
+p1 <- qplot(data = airquality,Temp,fill = Month,geom = "histogram", bins = 20)
+p1
+```
+
+# Plot 2: Make a histogram using ggplot (instead of qplot)
+
+```{r}
+p2 <- airquality %>%
+  ggplot(aes(x=Temp, fill=Month)) +
+  geom_histogram(position="identity", alpha=1, binwidth = 5, color = "white")+
+  scale_fill_discrete(name = "Month",  labels = levels(airquality$Month))
+p2
+```
+
+
+
+# Plot 3: Create side-by-side boxplots categorized by Month
+## y-axis appears to be temperatures, not frequencies
+
+```{r}
+p3 <- airquality %>%
+  ggplot(aes(Month, Temp, fill = Month)) + 
+  ggtitle("Temperatures") +
+  xlab("Months") +
+  ylab("Frequency") +
+  geom_boxplot() +
+  scale_fill_discrete(name = "Month", labels = levels(airquality$Month))
+p3 
+```
+
+
+# Plot 4: Make the same side-by-side boxplots, but in grey-scale
+```{r}
+p4 <- airquality %>%
+  ggplot(aes(Month, Temp, fill = Month)) + 
+  ggtitle("Temperatures") +
+  xlab("Temperatures") +
+  ylab("Frequency") +
+  geom_boxplot()+
+  scale_fill_grey(name = "Month", labels = levels(airquality$Month))
+p4
+```
+
+
+# **My turn:**
+##
+# **Plot 2a: Make a barplot using ggplot using fill color for Temperature**
+## How to do this with continuous Temp instead of factor?
+## Had to use negative Temp to get temperatures to rise from bottom
+
+```{r}
+airq<-airquality
+airq$Temp<-as.factor(-airq$Temp)
+
+p2a <- airq %>%
+  ggplot(aes(x=Month, fill=(Temp))) +
+  geom_bar(stat = "count")+
+  scale_fill_discrete(name = "Temp",  labels =levels(airq$Temp))
+p2a
+```
+
+# **Plot 3a: Create temperature heat map categorized by Month**
+
+```{r}
+p3a <- airquality %>%
+  ggplot(aes(Month,Temp)) + 
+  ggtitle("Temperatures") +
+  xlab("Months") +
+  ylab("Temperatures") +
+  geom_tile(aes(fill=Temp)) + 
+  scale_fill_gradient2(low="blue",mid="purple",high = "red",midpoint = median(airquality$Temp),limits=range(airquality$Temp))
+p3a 
+```
+
+# **Plot 3b: Another try from Stackoverflow:**
+## works better than the other tries
+```{r}
+p3b<-airquality %>%
+  ggplot(aes(Month,group=-Temp,fill=Temp))+
+  geom_bar()+
+  scale_fill_continuous(low="blue",high="red")
+p3b  
+```
+
+# **[My GitHub account](https://github.com/sdutky/mcData110)**
+## https://github.com/sdutky/mcData110
