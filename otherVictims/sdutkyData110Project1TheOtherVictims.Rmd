@@ -133,8 +133,58 @@ hom<-cbind(hom,boxes)
 ## fetch and clean the geocoded school datasent
 
 ```{r}
-#geoSchools<-read_csv(param$schoolUrl)
-names(geoSchools)<-tolower(names(geoSchools))
+geoSchools<-read_csv(param$schoolUrl)
+geoSchools<-geoSchools %>%
+ select(NAME,STREET,CITY,STATE,ZIP,LON,LAT)
+```
+## look at the distribution of homicides by city and the distribution of schools in cities with homicides
+
+```{r}
+homCityCount<-hom %>%
+  group_by(city) %>%
+  summarise(homicides=n())
+
+schoolsCityCount<- geoSchools %>%
+      transmute(city=str_to_title(CITY)) %>%
+      group_by(city) %>%
+      summarise(schools=n())
+
+homicidesJoinedSchoolsByCity<-inner_join(homCityCount,schoolsCityCount,by="city")
+
+print(homicidesJoinedSchoolsByCity,n=300)
+```
+
+
+```{r}
+mutate(dummy=TRUE) %>%
+      inner_join(homCityCount %>% mutate(dummy=TRUE)) %>%
+      filter(city==CITY) %>%
+      select(-dummy)
+```
+
+
+```{r}
+summarise(n())
+homCitySchoolsCount <-tibble()
+
+for (i in homCityCount$city)
+```
+
+
+```{r}
+homByCity=list()
+for ( i in homCity$city) {
+  homByCity[[i]]<- hom %>%
+    filter(city==i)
+}
+```
+
+```{r}
+hom1<- hom %>% 
+    mutate(dummy=TRUE) %>%
+    inner_join(geoSchools %>% mutate(dummy=TRUE)) %>%
+    filter(LAT>dueSouth,LAT<dueNorth,LON>dueWest,LON<dueEast) %>%
+    select(-dummy)
 ```
 
 ## Original Sources
