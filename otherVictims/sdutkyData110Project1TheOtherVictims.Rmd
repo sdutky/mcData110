@@ -8,8 +8,11 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+# [**All Datasets, files, and images**](https://github.com/sdutky/mcData110/tree/master/otherVictims)
+> [sdutkyData110Project1TheOtherVictims.Rmd](https://github.com/sdutky/mcData110/raw/master/otherVictims/sdutkyData110Project1TheOtherVictims.Rmd) should run in your environment
 
-![](./wpSchoolShootings.png) 
+
+''![](https://github.com/sdutky/mcData110/raw/master/otherVictims/wpSchoolShootings.png) 
 [The Washington Post School Shootings](https://www.washingtonpost.com/graphics/2018/local/school-shootings-database/)
 
 > School shootings are horrific events. By 2018 the Post counted 144 children, teachers and others killed in school assaults and 302 physically injured.  All present, however, suffer trauma. Using school enrollment, the Post tallied 228,000 children at 234 school incidents.
@@ -17,50 +20,44 @@ knitr::opts_chunk$set(echo = TRUE)
 ## What of the other victims?
 > Fortunately, school shootings are rare events. Many children, however, live in proximity to homicidal violence.  This is rarely newsworthy.  
   
-> Mimicking the Post, I set out to count the homicides occuring within 1/4 mile of a school and, using school enrollments, estimating the number of students affected.  This involved joining three datasets:
+> Mimicking the Post, I set out to count the homicides occuring within a threshold distance of a school and, using school enrollments, estimating the number of students affected.  This involved an API and several datasets:
 
 1. [**The Washington Post's Homicide Database**](https://github.com/washingtonpost/data-homicides)
-spans over 52,000 homicides across the U.S. between January 1, 2007 and December 31, 2015.  Each record provides, among other items, the victim's age and ethnicity, the date the crime was reported and the geocoordinates where the victim was found.
+spans over 52,000 homicides occuring in the 50 largest U.S. cities between January 1, 2007 and December 31, 2015.  Each record provides, among other items, the victim's age and ethnicity, the date the crime was reported and the geocoordinates where the victim was found.
 2. [**Education Demographic and Geographic Estimates (EDGE) Geocodes**](http://data-nces.opendata.arcgis.com/datasets/public-school-locations-2017-18/data)
 provides the geocoordinates and census identifiers of more than 102,000 U.S. public schools and agencies.
 3. [**National Center for Education Statistics**](https://nces.ed.gov/ccd/schoolsearch/index.asp)
  gives state by state each public school's enrollment, the number of teachers, and the number of students receiving free or reduced price lunches.
- 4. [**The Washington Post's database of school shootings in the United States since Columbine.](https://github.com/washingtonpost/data-school-shootings)
+ 4. [**The Washington Post's database of school shootings in the United States since Columbine.**](https://github.com/washingtonpost/data-school-shootings)
  provides a variety of data about each shooting as well as the schools at which they occurred.
- 
+5. [**Association for Learning Environments**](http://media.cefpi.org/issuetraks/issuetrak0903.pdf):
+ " Currently many states follow these site formulas:  
+ Elementary Schools = 10 acres plus 1 acre for every 100 students;  
+ Junior High/Middle Schools = 20 acres plus 1 acre for every 100 students;  
+ Senior High Schools = 30 acres plus 1 acre for every 100 students."  
+6. [**U.S. Census Batch Street Address Geocoding**](https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html#_Toc379292363)  
+7. [**Bounding Boxes for States**](https://anthonylouisdagostino.com/bounding-boxes-for-all-us-states/) used to verify that the geocoordinates of each homicide landed in the states in which they were reported.
+
+## Summation
+> Combining these datasets discloses, over a period of ten years, nearly two million students enrolled in schools in which a homicide was reported within a mean distance of 142 meters.  These schools reported a mean rate of 89% free and reduced price lunches.  This indicates that a large majority of these students lived in economically precarious households.  
+
+> How close in time and space must a child be near to a homicide to become traumatized?  However one answers this, I believe that the data here indicate that the potential trauma suffered by the students enrolled at the sites of school shootings might be eclipsed by the nation wide toll of routine violence.  
 ```{r}
 # load libraries
 library(tidyverse)
 library(geosphere)
+library(lubridate)
 ```
-## Pre-process schoolMoreInfo datasets
-## ```{r}  
-library(readxl)
-setwd("nces")  
-### collect the xls files  
-ncesList<-system("ls *.xls",intern=TRUE)  
-nces<-tibble()  
-#  
-# get each nces.xls as tibble, bind them to nces tibble  
-#  
-for ( i in ncesList) {  
-  t<-read_xls(i,skip=19)  
-  nces<-rbind(nces,t)    
-}  
-  
-write_csv(nces,"nces.csv")  
-
-## ```  
-
 ## Parameters:
 
 ```{r}
 
 param<-list()
-param$halfBoxDistance<-402.336 # distance to side of bounding box enclosing homicide. Used to find schools inside box
+param$halfBoxDistance<-174 # meters to sides of bounding box enclosing homicide. Used to find schools inside box
 param$homicideUrl="https://github.com/sdutky/mcData110/raw/master/otherVictims/homicide-data.csv"
-param$schoolUrl="https://github.com/sdutky/mcData110/raw/master/otherVictims/public-school-locations-2017-18.csv"
-param$schoolMoreInfUrl="https://github.com/sdutky/mcData110/raw/master/otherVictims/nces.csv"
+param$schoolCoordUrl="https://github.com/sdutky/mcData110/raw/master/otherVictims/public-school-locations-2017-18.csv"
+param$schoolNcesUrl="https://github.com/sdutky/mcData110/raw/master/otherVictims/nces.csv"
+param$schoolNcesGeocodingsUrl="https://github.com/sdutky/mcData110/raw/master/otherVictims/ncesGeocodings.csv"
 param$stateBboxUrl="https://gist.githubusercontent.com/a8dx/2340f9527af64f8ef8439366de981168/raw/81d876daea10eab5c2675811c39bcd18a79a9212/US_State_Bounding_Boxes.csv"
 ```
 
@@ -68,21 +65,22 @@ param$stateBboxUrl="https://gist.githubusercontent.com/a8dx/2340f9527af64f8ef843
 ## load, view, clean, & prep homicide dataset
 
 ```{r}
-library(tidyverse)
-hom<-read_csv(param$homicideUrl)
+homicide<-read_csv(param$homicideUrl)
 
-hom$victim_age<-as.numeric(hom$victim_age)
-#str(hom)
-#summary(hom)
+homicide$victim_age<-as.numeric(homicide$victim_age)
+#str(homicide)
+#summary(homicide)
 
 # drop rows where either lat or lon is NA
-hom<-hom %>%
+homicide<-homicide %>%
   drop_na(lat,lon)
          
-summary(hom)
-a<-seq_along(hom$state)[hom$state=="wI"]
-hom$state[a]="WI"
-print(sort(unique(hom$state)))
+summary(homicide)
+
+#fix error
+a<-seq_along(homicide$state)[homicide$state=="wI"]
+homicide$state[a]="WI"
+print(sort(unique(homicide$state)))
 ```
 
 ## filter homicide rows where lat,lon lie outside of the bounding boxes of their respective states
@@ -91,18 +89,21 @@ print(sort(unique(hom$state)))
 bb<-read_csv(param$stateBboxUrl)
 names(bb)[3]<-"state"
 bb<-bb[,c("state","xmin","xmax","ymin","ymax")]
-summary(hom) # get snapshot before
-hom<- hom %>%
+hDropped<-nrow(homicide) # get snapshot before
+homicide<- homicide %>%
   inner_join(bb,by="state") 
-hom<- hom %>%
+homicide<- homicide %>%
   filter(!(lat<=xmax & lat>=xmin & lon<=ymax & lon>=ymin))
-summary(hom) # and after to compare to before
+hDropped<-hDropped-nrow(homicide) # and after to compare to before
+#  All pass filter: no drops
 
 # drop xmin,xmax,ymin,ymax:
-hom<-hom %>% select(-c(xmin,xmax,ymin,ymax))
+homicide<-homicide %>% select(-c(xmin,xmax,ymin,ymax))
 
 ```
-## Identify all schools located within 1/2 mile of a homicide
+
+## `r hDropped` homicides outside of state borders dropped
+## Identify all schools located within threshold distance of a homicide
 
 ```{r}
 bBox<-function(lat,lon,threshold=param$halfBoxDistance) {
@@ -115,82 +116,267 @@ bBox<-function(lat,lon,threshold=param$halfBoxDistance) {
   dlon<-mapply(dLon, lon, lat)
   dlat<-mapply(dLat, lon, lat)
   
-  dueEast<-lon+threshold/dlon
-  dueWest<-lon-threshold/dlon
-  dueNorth<-lat+threshold/dlat
-  dueSouth<-lat-threshold/dlat
-  return(tibble(dueEast=dueEast,dueWest=dueWest,
-                dueSouth=dueSouth,dueNorth=dueNorth))
+  eastSide<-lon+threshold/dlon
+  westSide<-lon-threshold/dlon
+  northSide<-lat+threshold/dlat
+  southSide<-lat-threshold/dlat
+  return(tibble(eastSide=eastSide,westSide=westSide,
+                southSide=southSide,northSide=northSide))
 }
 ```
 
 ## generate the bonding boxes enclosing each homicide and bind it to the homicide tibble
 
 ```{r}
-boxes<-bBox(hom$lat,hom$lon)
-hom<-cbind(hom,boxes)
+boxes<-bBox(homicide$lat,homicide$lon)
+homicide<-cbind(homicide,boxes)
 ```
-## fetch and clean the geocoded school datasent
+
+
+## fetch and clean the NCESS dataset of all schools
 
 ```{r}
-geoSchools<-read_csv(param$schoolUrl)
-geoSchools<-geoSchools %>%
- select(NAME,STREET,CITY,STATE,ZIP,LON,LAT)
+
+allSchools<-read_csv(param$schoolNcesUrl)
+summary(allSchools) # pre-cleaning
+
+names(allSchools)<-str_to_title(names(allSchools))
+names(allSchools)<-gsub("[[:punct:] ]*","",names(allSchools))
+
+allSchools<-allSchools %>%
+      mutate(
+        City=str_to_title(City),
+        FreeLunch=as.numeric(FreeLunch),
+        ReducedLunch=as.numeric(ReducedLunch),
+        Students=as.numeric(Students),
+        Teachers=as.numeric(Teachers),
+        StudentTeacherRatio=as.numeric(StudentTeacherRatio),
+        SubsidizedLunchFraction=(FreeLunch+ReducedLunch)/Students,
+        NcesSchoolId=as.character(NcesSchoolId)
+                          ) %>%
+     drop_na(Students,Teachers) %>%
+     filter(Students<5000) %>% # remove 8 cyber academies
+     filter(Teachers<1000) %>% # Florida Virtual School
+     filter(Students>=1 & Teachers>=1) 
+      
+allSchools$SubsidizedLunchFraction[allSchools$SubsidizedLunchFraction>1]<-NA
+
+summary(allSchools)
 ```
+## join up allSchools with schoolEncodings by NcesSchoolId to merge geolocations with school details
+
+```{r}
+schoolCoord<-read_csv(param$schoolCoordUrl)
+names(schoolCoord)<-str_to_title(names(schoolCoord))
+
+geoSchools<- schoolCoord[,c("Ncessch","Lat","Lon")] %>%
+      inner_join(allSchools,by=c("Ncessch"="NcesSchoolId"  ))
+```
+
+
 ## look at the distribution of homicides by city and the distribution of schools in cities with homicides
 
 ```{r}
-homCityCount<-hom %>%
+homicideCityCount<-homicide %>%
   group_by(city) %>%
   summarise(homicides=n())
 
-schoolsCityCount<- geoSchools %>%
-      transmute(city=str_to_title(CITY)) %>%
-      group_by(city) %>%
+schoolsCityCount<- allSchools %>%
+      group_by(City) %>%
       summarise(schools=n())
 
-homicidesJoinedSchoolsByCity<-inner_join(homCityCount,schoolsCityCount,by="city")
+homicidesJoinedSchoolsByCity<-inner_join(homicideCityCount,schoolsCityCount,by=c("city" ="City"))
 
 print(homicidesJoinedSchoolsByCity,n=300)
 ```
 
 
-```{r}
-mutate(dummy=TRUE) %>%
-      inner_join(homCityCount %>% mutate(dummy=TRUE)) %>%
-      filter(city==CITY) %>%
-      select(-dummy)
-```
-
+![](https://github.com/sdutky/mcData110/raw/master/otherVictims/bBox.png) 
 
 ```{r}
-summarise(n())
-homCitySchoolsCount <-tibble()
-
-for (i in homCityCount$city)
-```
-
-
-```{r}
-homByCity=list()
-for ( i in homCity$city) {
-  homByCity[[i]]<- hom %>%
-    filter(city==i)
-}
-```
-
-```{r}
-hom1<- hom %>% 
+getMatchingSchoolsByCity<-function(cityArg,tblHomicides,tblGeoSchools) {
+  as_tibble( tblHomicides %>% 
+    filter(city==cityArg) %>%
     mutate(dummy=TRUE) %>%
-    inner_join(geoSchools %>% mutate(dummy=TRUE)) %>%
-    filter(LAT>dueSouth,LAT<dueNorth,LON>dueWest,LON<dueEast) %>%
-    select(-dummy)
+    inner_join(tblGeoSchools %>% 
+                 filter(City==cityArg) %>%
+                 mutate(dummy=TRUE)) %>%
+    filter(Lat>southSide,Lat<northSide,Lon>westSide,Lon<eastSide) %>%
+    select(-dummy,-city,-state)
+  )
+} 
+```
+## Collect the schools that fit into the bounding box of each homicide
+
+```{r}
+schoolsNearHomicides<-tibble()
+for (city in homicideCityCount$city) {
+  schoolsNearHomicides<-rbind(schoolsNearHomicides,getMatchingSchoolsByCity(city,homicide,geoSchools))
+}
+
+print(
+  paste(
+    nrow(schoolsNearHomicides),
+    "homicides occuring within",
+    param$halfBoxDistance,
+    "meters of a school traumatizing",
+    sum(schoolsNearHomicides$Students),
+    "students")
+)
+```
+## Calculate distance to school, arrange by date, insert cummulative sums of homicides and students affected
+```{r}
+schoolsNearHomicides <- schoolsNearHomicides %>%
+  arrange(reported_date) 
+  
+schoolsNearHomicides$cumHomicides<-cumsum(rep(1,nrow(schoolsNearHomicides)))
+schoolsNearHomicides$cumTrauma<-cumsum(schoolsNearHomicides$Students)
+
+f<-function(lat,lon,Lat,Lon) distGeo(c(lon,lat),c(Lon,Lat))
+
+schoolsNearHomicides$distance<-mapply(f,schoolsNearHomicides$lat,schoolsNearHomicides$lon,schoolsNearHomicides$Lat,schoolsNearHomicides$Lon)
+
+
 ```
 
-## Original Sources
-[Bounding Boxes for States](https://anthonylouisdagostino.com/bounding-boxes-for-all-us-states/)
 
-## Determine the distributions of the distances of these schools from the homicides
-## perform joins to identify #students, student/teacher ratio, free lunch counts of these schools.
-## compare to all schools.
-## estimate number of students enrolled affected by homicides
+
+
+## Partition allSchools into those not near a homicide
+```{r}
+schoolsNotNearHomicides<-allSchools %>%
+      anti_join(schoolsNearHomicides,
+                by=c("NcesSchoolId"="Ncessch"))
+
+```
+## **Between `r ymd(schoolsNearHomicides$reported_date[1])` and `r ymd(tail(schoolsNearHomicides$reported_date,n=1))`, `r format(as.integer(sum(schoolsNearHomicides$Students)),big.mark=",",scientific=FALSE)` students exposed to `r nrow(schoolsNearHomicides)` homicides occuring within a mean of `r round(mean(schoolsNearHomicides$distance))` meters of a school.**
+
+```{r}
+print.data.frame( schoolsNearHomicides %>%
+  group_by(City) %>%
+  summarise(exposure=sum(Students),homicides=n()) %>%
+  arrange(desc(exposure)) %>%
+  mutate(rate=round(exposure/homicides)) %>%
+  mutate(exposure=format(exposure,big.mark = ",",scientific = FALSE)),
+  width=120)
+
+```
+
+## **Plots**
+
+```{r}
+g<-ggplot(schoolsNearHomicides, aes(x=ymd(reported_date))) +                    # basic graphical object
+  labs(title="cumulative homicides and students exposed")+
+  #scale_x_continuous(name="date")+
+  scale_y_continuous(name="counts", trans="log10")+
+   xlab("date")+
+  #ylab("count")+
+  geom_line(aes(y=(cumTrauma)), colour="red",size=1) +  # first layer
+  geom_line(aes(y=(cumHomicides)), colour="green",size=1)+  # second layer
+  scale_colour_manual("", 
+                      labels = c("cT", "cH"),
+                      values = c("red", "green")) 
+  #scale_color_discrete(name = "incidents", labels = c("cumHomicides", "cumTrauma"))
+g
+```
+
+```{r}
+title="Distribtution of Distances of Schools from Homicides"
+
+cols=c("Not Near Homicides"="#FF0000","Near Homicides"="#00FF00")
+a<-ggplot()+
+  labs(title=title,x="distance in meters",
+      y="count")+
+geom_density(data=schoolsNearHomicides, aes(x=distance,y=..count..),color='green',show.legend=TRUE) +
+  geom_vline(data=schoolsNearHomicides,aes(xintercept = mean(distance,na.rm = TRUE)),
+             linetype = "dashed",color='green', size = 0.8)+
+  geom_vline(data=schoolsNearHomicides,aes(xintercept = mean(distance,na.rm = TRUE)+sd(distance,na.rm = TRUE)),
+             linetype = "dashed",color='green', size = 0.4)+
+  geom_vline(data=schoolsNearHomicides,aes(xintercept = mean(distance,na.rm = TRUE)-sd(distance,na.rm = TRUE)),
+             linetype = "dashed",color='green', size = 0.4)
+a
+
+```
+
+![https://frac.org/school-meal-eligibility-reimbursements](https://github.com/sdutky/mcData110/raw/master/otherVictims/lunchEligibilty.png)
+
+
+```{r}
+
+title="Comparison of Schools Nearby and Distant from Homicides"
+
+cols=c("Not Near Homicides"="#FF0000","Near Homicides"="#00FF00")
+a<-ggplot()+
+  labs(title=title,x="Fraction of Students receiving Subsidized Lunch",
+      y="count")+
+  scale_colour_manual(name="Schools",values=cols)+
+  scale_fill_manual(name="Schools",values=cols) +
+geom_density(data=schoolsNearHomicides, aes(x=SubsidizedLunchFraction,y=..count..),color='green',show.legend=TRUE) +
+  geom_vline(data=schoolsNearHomicides,aes(xintercept = mean(SubsidizedLunchFraction,na.rm = TRUE)),
+             linetype = "dashed",color='green', size = 0.8)+
+  geom_vline(data=schoolsNearHomicides,aes(xintercept = mean(SubsidizedLunchFraction,na.rm = TRUE)+sd(SubsidizedLunchFraction,na.rm = TRUE)),
+             linetype = "dashed",color='green', size = 0.4)+
+  geom_vline(data=schoolsNearHomicides,aes(xintercept = mean(SubsidizedLunchFraction,na.rm = TRUE)-sd(SubsidizedLunchFraction,na.rm = TRUE)),
+             linetype = "dashed",color='green', size = 0.4)+
+geom_density(data=schoolsNotNearHomicides, aes(x=SubsidizedLunchFraction,y=..count..), color='red',show.legend=TRUE)+
+  geom_vline(data=schoolsNotNearHomicides,aes(xintercept = mean(SubsidizedLunchFraction,na.rm = TRUE)), 
+             linetype = "dashed",color='red', size = 0.8)+
+  geom_vline(data=schoolsNotNearHomicides,aes(xintercept = mean(SubsidizedLunchFraction,na.rm = TRUE)+sd(SubsidizedLunchFraction,na.rm = TRUE)),
+             linetype = "dashed",color='red', size = 0.4)+
+  geom_vline(data=schoolsNotNearHomicides,aes(xintercept = mean(SubsidizedLunchFraction,na.rm = TRUE)-sd(SubsidizedLunchFraction,na.rm = TRUE)),
+             linetype = "dashed",color='red', size = 0.4)
+a
+
+```
+
+## **Apply t-test to determine significant difference in means for Subsidized Lunches between schools nearby and distant from homicides.**
+
+```{r}
+t.test(schoolsNearHomicides$SubsidizedLunchFraction,
+       schoolsNotNearHomicides$SubsidizedLunchFraction)
+```
+
+
+
+```
+
+# Dataset preparation for command line processing:
+## Merge schoolNceso state xls datasets into combined tibble
+##```{r}  
+library(readxl)
+setwd("nces")  
+### collect the xls files  
+ncesList<-system("ls *.xls",intern=TRUE)  
+nces<-tibble()  
+#  
+#get each nces.xls as tibble, bind them to nces tibble  
+#  
+for ( i in ncesList) {  
+  t<-read_xls(i,skip=19)  
+  nces<-rbind(nces,t)    
+}  
+  
+write_csv(nces,"nces.csv")  
+
+#```  
+
+## Extract matching homicide cities from nces for geocoding:
+#{r}  
+ncesRaw<-read_csv(param\$schoolNcesUrl)  
+#normalize column names, removing asterisks and spaces  
+names(ncesRaw)<-gsub("[ *]*","",names(ncesRaw))  
+#eliminate rows containing cities not counted  
+#after first setting city names to titled case  
+nces<-ncesRaw %>%  
+\  mutate(City=str_to_title(City)) %>%  
+\  inner_join(homicideCityCount,by=c("City"="city"))  
+#extract NCESSchoolID,StreetAddress,City,State,ZIP  
+geocode<- nces %>%   
+select(NCESSchoolID,StreetAddress,City,State,ZIP)  
+write_csv(geocode,"geocode.csv")  
+
+## NB: geocode.csv gets encoded using the US Census Bureau [**API**](https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html#_Toc379292359)
+> from the command line:  
+> curl --form addressFile=@geocode.csv --form benchmark=9 https://geocoding.geo.census.gov/geocoder/locations/addressbatch --output result.csv  
+> The rows of result.csv where encoding has failed will contain "No_Match" or "Tie". Successful encodings will have "Match" and an indicator of the encoding was Exact or "Non_Exact". The processed file was uploaded to GitHub. Its url is stored here in param$schoolNcesGeocodingsUrl
+
