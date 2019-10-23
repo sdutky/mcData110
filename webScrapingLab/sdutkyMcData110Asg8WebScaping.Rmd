@@ -1,0 +1,252 @@
+---
+title: "week8WebScrapingLab"
+author: "Steve Dutky"
+date: "10/20/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Load the libraries we will be using:
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(rvest)
+```
+
+
+## Download and unzip saved IMDB search results from GitHub
+IMDB search 'http://www.imdb.com/search/title?count=100&release_date=2016,2016&title_type=feature' results previously saved, zipped, and uploaded to GitHub. We now download them from GitHub and unzip them in the R session's temporary directory.
+
+```{r}
+gitUrl<-"https://github.com/sdutky/mcData110/raw/master/webScrapingLab/webScrapingLab.zip"
+setwd(tempdir())
+download.file(gitUrl,"webScrapingLab.zip",method = "auto")
+system("unzip -o -q webScrapingLab.zip")
+# on windows, try the following:
+# system('compact /u "webScrapingLab.zip" /i /Q /f')
+# c:\\wimdows\\system32 must be on PATH
+```
+## Read the local copy of the webpage using the rvest library
+"webScrapingLab.html" is a copy of the saved "Feature Film, Released between 2016-01-01 and 2016-12-31 (Sorted by Popularity Ascending) - IMDb.html"
+```{r}
+library('rvest')
+
+webpage <- read_html(paste(tempdir(),"/webScrapingLab.html", sep=""))
+```
+
+
+
+## Now, we’ll be scraping the following data from this website.
+
+**Rank**: The rank of the film from 1 to 100 on the list of 100 most popular feature films released in 2016.  
+**Title**: The title of the feature film.  
+**Description**: The description of the feature film.  
+**Runtime**: The duration of the feature film.  
+**Genre**: The genre of the feature film,  
+**Rating**: The IMDb rating of the feature film.  
+**Metascore**: The metascore on IMDb website for the feature film.  
+**Votes**: Votes cast in favor of the feature film.  
+**Gross_Earning_in_Mil**: The gross earnings of the feature film in millions.  
+**Director**: The first, main director of the feature film.  
+**Actor**: The main actor in the feature film. 
+
+## Process and clean data:
+> Scrape each field, use gsub to remove extraneous punctuation such as newlines and trailing spaces.  If there are fewer than 100 values scraped, insert NA's where there are missing values.  Coerce numeric strings to numeric values.  
+> add the values on to tibble IMDB.
+  
+## create function to return text scraped from webpage as selected by CSS:
+
+```{r}
+scrapeCssText<-function(webPage,cssSelector) {
+#Using CSS selectors to scrape the HTML of the section of interest
+html <- html_nodes(webPage, cssSelector)
+
+#Convert and return the html data as a text vector
+html_text(html)
+}
+# initialize our tibble
+```
+
+## **Rank**: The rank of the film from 1 to 100 on the list of 100 most popular feature films released in 2016.  
+```{r}
+rank_data <- scrapeCssText(webpage,'.text-primary')
+
+
+#Let's have a look at the rankings
+summary(rank_data)
+head(rank_data)
+
+# coerce to numeric
+rank_data<-as.integer(rank_data)
+
+IMDB<-tibble( rank=rank_data)
+```
+
+## **Title**: The title of the feature film.  
+```{r}
+title_data <- scrapeCssText(webpage,'.lister-item-header a')
+
+
+#Let's have a look at the titles
+summary(title_data)
+head(title_data)
+
+IMDB$title<-as.character(title_data)
+```
+## **Description**: The description of the feature film.  
+```{r}
+description_data <- scrapeCssText(webpage,'.ratings-bar+ .text-muted')
+
+
+#Let's have a look at the description
+summary(description_data)
+head(description_data)
+# get rid of leading newlines and spaces
+description_data<-gsub("^\\n *","",description_data)
+
+IMDB$description<-as.character(description_data)
+```
+
+## **Runtime**: The duration of the feature film.  
+
+```{r}
+runtime_data <- scrapeCssText(webpage,'.runtime')
+
+
+#Let's have a look at the runtimes
+summary(runtime_data)
+head(runtime_data)
+
+# get rid of all non-numerics, then convert to integer
+runtime_data<-as.integer(gsub("[^0-9]*","",runtime_data))
+IMDB$runtime<-runtime_data
+```
+
+
+##  **Genre**: The genre of the feature film,  
+
+```{r}
+genre_data <- scrapeCssText(webpage,'.genre')
+
+summary(genre_data)
+head(genre_data)
+
+# Clean up genre data by removing leading newline and trailing spaces
+genre_data<-gsub("^\\n","",genre_data)
+genre_data<-gsub(" *$","",genre_data)
+# keep only the first category, eliminating everything starting with the comma
+genre_data<-gsub(",.*$","",genre_data)
+
+IMDB$genre<-as.character(genre_data)
+
+```
+
+## **Rating**: The IMDb rating of the feature film.  
+
+```{r}
+rating_data <- scrapeCssText(webpage,'.ratings-imdb-rating strong')
+summary(rating_data)
+head(rating_data)
+IMDB$rating<-as.numeric(rating_data)
+```
+
+## **Metascore**: The metascore on IMDb website for the feature film.  
+
+```{r}
+metascore_data <- scrapeCssText(webpage,'.metascore')
+summary(metascore_data)
+head(metascore_data)
+
+# eliminate non-numerics, coerce to integer
+metascore_data<-as.integer(gsub("[^0-9]*","",metascore_data))
+# insert NA's where they belong
+metascore_data<-c(metascore_data[1:4],NA,
+                  metascore_data[5:19],NA,
+                  metascore_data[20:34],NA,
+                  metascore_data[35:42],NA,
+                  metascore_data[43:63],NA,
+                  metascore_data[64:65],NA,
+                  metascore_data[66:94])
+IMDB$metascore<-metascore_data
+```
+
+## **Votes**: Votes cast in favor of the feature film.  
+
+```{r}
+votes_data <- scrapeCssText(webpage,'.sort-num_votes-visible span:nth-child(2)')
+summary(votes_data)
+head(votes_data)
+# get rid of comma, coerce to integer
+votes_data<-as.integer(gsub(",","",votes_data))
+IMDB$votes<-votes_data
+```
+
+## **Gross_Earning_in_Mil**: The gross earnings of the feature film in millions.  
+
+```{r}
+gross_data <- scrapeCssText(webpage,'.ghost~ .text-muted+ span')
+summary(gross_data)
+head(gross_data)
+# get rid of non-numerics but keep decimal point and coerce to numeric
+gross_data<-as.numeric(gsub("[^0-9.]*","",gross_data))
+# insert NA's where they belong:
+gross_data<-c( gross_data[1:20],NA,
+               gross_data[21:35],NA,
+               gross_data[36],NA,NA,
+               gross_data[37:61],NA,
+               gross_data[62:64],NA,
+               gross_data[65],NA,
+               gross_data[66:90],NA,
+               gross_data[91:92]
+)
+IMDB$gross<-gross_data
+```
+
+## **Director**: The first, main director of the feature film.
+
+```{r}
+director_data <- scrapeCssText(webpage,'.text-muted+ p a:nth-child(1)')
+summary(director_data)
+head(director_data)
+IMDB$director<-as.character(director_data)
+```
+
+## **Actor**: The main actor in the feature film.
+
+```{r}
+actor_data <- scrapeCssText(webpage,'.lister-item-content .ghost+ a')
+summary(actor_data)
+head(actor_data)
+IMDB$actor<-as.character(actor_data)
+```
+
+## display the vitals of IMDB
+```{r}
+str(IMDB)
+summary(IMDB)
+IMDB
+```
+
+
+## Plots:
+
+```{r}
+qplot(data = IMDB,runtime,margins=TRUE,fill = genre,bins = 30)
+```
+
+
+```{r}
+ggplot(IMDB,aes(x=runtime,y=rating))+
+geom_point(aes(size=votes,col=genre))
+```
+
+
+```{r}
+ggplot(IMDB,aes(x=runtime,y=gross))+
+geom_point(aes(size=rating,col=genre))
+```
+
+
