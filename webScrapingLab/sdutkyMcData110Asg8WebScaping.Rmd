@@ -3,16 +3,30 @@ title: "week8WebScrapingLab"
 author: "Steve Dutky"
 date: "10/20/2019"
 output: html_document
+fig_caption: yes
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+  
+### [source](https://raw.githubusercontent.com/sdutky/mcData110/master/webScrapingLab/sdutkyMcData110Asg8WebScaping.Rmd)  
+  
+  
+## Notice **fig_caption: yes** in the title block source:
+> This permits code chunks, plots, and output to be captioned by including the caption in the leader of the code chunk:  
+**```{r figN,fig.cap="\\label{fig:figN}Source: snapshot of http://www.imdb.com/search/title?count=100&release_date=2016,2016&title_type=feature"}**  
+  
+> In this case it is the url of IMDB search that we are scraping
+
 ## Load the libraries we will be using:
 
 ```{r}
 library(tidyverse)
 library(ggplot2)
+library(plotly)
+library(RColorBrewer)
+
 library(rvest)
 ```
 
@@ -67,7 +81,6 @@ html <- html_nodes(webPage, cssSelector)
 #Convert and return the html data as a text vector
 html_text(html)
 }
-# initialize our tibble
 ```
 
 ## **Rank**: The rank of the film from 1 to 100 on the list of 100 most popular feature films released in 2016.  
@@ -233,20 +246,157 @@ IMDB
 
 ## Plots:
 
+
+## Saurav Kaushik's qplot:
+
 ```{r}
-qplot(data = IMDB,runtime,margins=TRUE,fill = genre,bins = 30)
+qplot(data = IMDB,runtime,fill = genre,bins = 30)
 ```
 
+## My version using ggplot with geom_histogram with ggplotly:
+
+
+```{r fig1,fig.cap="\\label{fig:fig1}Source: snapshot of http://www.imdb.com/search/title?count=100&release_date=2016,2016&title_type=feature"}
+gh<-ggplot(data=IMDB,aes( x=runtime,fill=genre))+
+  labs(title="Histogram of the Top 100 Films of 2016\nby Runtime, Color Filled by Genre")+
+  theme(plot.title = element_text(hjust=0,size=10))+
+  scale_fill_brewer(palette = "Set1")+
+  geom_histogram(color="white",bins=30)
+ggplotly(gh)
+```
+## My version, take 2: add more information to plotly tooltips
+
+```{r fig1.1,fig.cap="\\label{fig:fig1.1}Source: snapshot of http://www.imdb.com/search/title?count=100&release_date=2016,2016&title_type=feature"}
+makeHist<-IMDB # make new copy for putting histogram together
+
+# compute bin breaks for geom_histogram
+breaks<-hist(makeHist$runtime,breaks="Scott", plot=FALSE)$breaks 
+makeHist$bin<-cut(makeHist$runtime,breaks,labels=FALSE) # assign each row to a bin
+
+makeHist<- makeHist %>%
+  mutate(bin=as.character(bin)) %>%
+  group_by(  bin,genre) %>%
+  mutate(meanRuntime=mean(runtime),meanRank=mean(rank),
+         minRuntime=min(runtime),maxRuntime=max(runtime),
+            meanGross=mean(gross,na.rm=TRUE),meanRating=mean(rating)) %>%
+  select(runtime,bin,genre,meanRuntime,minRuntime,maxRuntime,
+         meanRank,meanGross,meanRating) %>%
+  mutate(meanGross=replace(meanGross,is.na(meanGross),0)) %>%
+  arrange(bin,genre)
+
+gh<-ggplot(data=makeHist,aes( x=meanRuntime,fill=genre,
+      labelMark="______________", labelBin=bin,
+      label0=meanRuntime,labelMax=maxRuntime,
+      labelMin=minRuntime,label1=meanRank,
+      label2=meanGross,label3=meanRating
+  ))+
+  labs(title="Histogram of the Top 100 Films of 2016\nby Runtime, Color Filled by Genre")+
+  theme(plot.title = element_text(hjust=0,size=10))+
+  scale_fill_brewer(palette = "Set1")+
+  geom_histogram(color="white",breaks=breaks)
+#gh
+ggplotly(gh)
+```
+
+## Question 1: Based on the above data, which movie from which Genre had the longest runtime?
+
+```{r}
+
+answer<-IMDB %>%
+  filter(runtime>150) %>%
+  select(title,genre,runtime) %>%
+  filter(runtime>=max(runtime))
+
+answer
+
+
+
+```
+
+
+## Saurav Kaushik's point plot:
 
 ```{r}
 ggplot(IMDB,aes(x=runtime,y=rating))+
 geom_point(aes(size=votes,col=genre))
 ```
 
+## My version: using ggplotly and geom_rug to add rug plots to see the distributions of the variables on the x and y axes.
+
+```{r fig2,fig.cap="\\label{fig:fig2}Source: snapshot of http://www.imdb.com/search/title?count=100&release_date=2016,2016&title_type=feature"}
+gp<-ggplot(IMDB)+
+  aes(x=runtime,y=rating, size=votes,fill=genre,
+      label0="-------",label1=rank, label2=title, label4=runtime, label5=genre, label6=rating, label7=metascore, label8=votes, label9=gross, label10=director, label11=actor)+
+  labs(title="Point Plot of the Top 100 Films of 2016\nsized by votes and color filled by genre")+
+  theme(plot.title = element_text(hjust=0,size=10))+
+  guides(size=FALSE)+ # supress legend for size/votes
+  scale_color_brewer(palette = "Set1")+
+  scale_fill_brewer(palette = "Set1")+
+geom_point(col="white")+
+  geom_rug(inherit.aes = FALSE,
+           data=IMDB,
+           aes(x=runtime,y=rating,color=genre))
+ggplotly(gp)
+#gp
+```
+
+```{r}
+# Diagnostice for submitting to Stack Overflow
+#dput(IMDB[,c("runtime","title","rating","votes","genre","rank","metascore","gross","director","actor")])
+```
+
+
+## Question 2: Based on the above data, in the Runtime of 130-160 mins, which genre has the highest votes?
+
+```{r}
+answer<- IMDB %>%
+  filter(runtime>129 & runtime<161) %>%
+  group_by(genre) %>%
+  summarise(sumVotes=sum(votes)) %>%
+  arrange(desc(sumVotes)) 
+
+answer[1,]
+```
+
+## Saurav Kaushik's point plot of runtime vs gross:
 
 ```{r}
 ggplot(IMDB,aes(x=runtime,y=gross))+
 geom_point(aes(size=rating,col=genre))
 ```
 
+## My version: again with ggplotly and geom_rug
 
+```{r fig3,fig.cap="\\label{fig:fig3}Source: snapshot of http://www.imdb.com/search/title?count=100&release_date=2016,2016&title_type=feature"}
+gp<-ggplot(IMDB)+
+  aes(x=runtime,y=gross, size=rating,color=genre,
+      label0="-------",label1=rank, label2=title, label4=runtime, label5=genre, label6=rating, label7=metascore, label8=votes, label9=gross, label10=director, label11=actor)+
+  labs(title="Point Plot of the Top 100 Films of 2016\nsized by rating and color filled by genre")+
+  theme(plot.title = element_text(hjust=0,size=10))+
+  guides(size=FALSE)+ # supress legend for size/rating
+  scale_color_brewer(palette = "Set1")+
+  scale_fill_brewer(palette = "Set1")+
+geom_point()+
+  geom_rug(inherit.aes = FALSE,data=IMDB,aes(x=runtime,y=gross,color=genre))
+ggplotly(gp)
+```
+
+
+## Question 3: Based on the above data, across all genres which genre has the highest average gross earnings in runtime 100 to 120
+
+```{r}
+answer<-IMDB %>%
+  filter(runtime>99 & runtime<121) %>%
+  group_by(genre) %>%
+  summarise(meanGross=mean(gross,na.rm=TRUE)) %>%
+  arrange(desc(meanGross))
+
+answer[1,]
+```
+
+##  [Mystery](https://stackoverflow.com/questions/58581244/rcolorbrewer-scale-fill-brewer-puts-parentheses-around-legend-keys)
+> I can't explain what happens with the fill and boundary colors of my two point plots above using colorbrewer above.  
+>  
+> The code is essentially identical for both plots, however the first call to geom_point requires 'col="white"' to avoid having the points surrounded by a black boundary line.  Including 'col="white"' in the second call to geom_point turns the points completely white.  
+>  
+> Additionally I don't understand why the legend key labels take the format (label,1).
