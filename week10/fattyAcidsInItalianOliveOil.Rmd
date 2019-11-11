@@ -1,0 +1,309 @@
+---
+title: "Fatty Acids in Italian Olive Oil"
+author: "Steve Dutky MC Data110 Fall 2019"
+date: "11/8/2019"
+output: html_document
+fig_caption: yes
+---
+<style>
+p.caption {
+  font-size: 16pt;
+  text-align: justify;
+  margin-left: 80pt ;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## This project was inspired by [Ken Nordine](https://en.wikipedia.org/wiki/Ken_Nordine)
+
+<audio id="player" controls autoplay>
+  <source src="Olive.mp3" type="audio/mpeg">
+</audio>  (audio included under ASCAP educational license)
+
+> The olive data set of the [Data Science Labs Package](https://cran.r-project.org/web/packages/dslabs/dslabs.pdf) describes the percentage composition of fatty acids in olive oil from a variety of regions and areas of Italy collected from [J. Zupan, et al., 1994](https://www.sciencedirect.com/science/article/pii/0003267094000859).  We will look for correlations between the components and their origins and plot what looks interesting.
+>   
+## Background from [The Olive Oil Source:](https://cran.r-project.org/package=dslabs)
+> The fatty acid composition of olive oil varies widely depending on the cultivar, maturity of the fruit, altitude, climate, and several other factors.
+
+* A fatty acid has the general formula: CH3(CH2)nCOOH where n is typically an even number between 12 and 22.
+* If no double bonds are present the molecule is called a saturated fatty acid.
+* If a chain contains double bonds, it is called an unsaturated fatty acid.
+* A single double bond makes a monounsaturated fatty acid.
+* More than one double bond makes a polyunsaturated fatty acid.
+
+> The major fatty acids in olive oil triacylglycerols are:
+
+* Oleic Acid (C18:1), a monounsaturated omega-9 fatty acid. It makes up 55 to 83% of olive oil.
+* Linoleic Acid (C18:2), a polyunsaturated omega-6 fatty acid that makes up about 3.5 to 21% of olive oil.
+* Palmitic Acid (C16:0), a saturated fatty acid that makes up 7.5 to 20% of olive oil.
+* Stearic Acid (C18:0), a saturated fatty acid that makes up 0.5 to 5% of olive oil.
+* Linolenic Acid (C18:3)(specifically alpha-Linolenic Acid), a polyunsaturated omega-3 fatty acid that makes up 0 to 1.5% of olive oil.  
+
+>  The olive dataset also includes arachidic, eicosenoic, and palmitoleic acids.
+
+## load the required libraries:
+
+```{r}
+library(dslabs)
+library(tidyverse)
+library(ggplot2)
+library(RColorBrewer)
+library(plotly)
+
+```
+
+## fetch, tibblelize and characterize the olive dataset
+
+```{r}
+data(olive)
+olive<-as.tibble(olive)
+# examine its structure:
+str(olive)
+# convert factors to characters
+olive$region<-as.character(olive$region)
+olive$area<-as.character(olive$area)
+# check the summary
+summary(olive)
+```
+## make sure that the total percentages are acceptably close to 100
+
+```{r}
+totalPcts<-olive %>%
+  select(-region,-area) %>%
+  rowSums()
+
+summary(totalPcts)
+length(totalPcts)
+
+```
+
+
+## look at the distribution of observations by region and areas
+
+```{r}
+  olive %>%
+  select(region,area) %>%
+  group_by(region, area) %>%
+  summarise(count=n())
+```
+
+## Look at country wide fatty acid correlations:
+
+```{r}
+options(width = 300)
+corFA<-as.data.frame( cor(olive[,3:10]))
+print(as_tibble(corFA),digits = 2, width=300)
+```
+
+## summarise absolute correlations
+
+```{r}
+mask<-upper.tri(corFA,diag = FALSE)
+f<-function(a) if (a) 1 else NA
+
+# eliminate lower triangle
+corFA<-as.matrix(corFA*sapply(mask, f))
+print(corFA)
+summary(abs(as.numeric(corFA)))
+# save third quartile as threshold cut off
+q3<-summary(abs(as.numeric(corFA)))[5]
+
+```
+
+# identify all pairs with significant correlations >= `r q3`
+
+```{r}
+f<-function(a) if (is.na(a)) NA else if(abs(a)>=q3) 1 else NA
+sig<-(corFA*sapply(corFA, f))
+
+print(sig,digits = 2)
+
+fa2<-as.character(sapply(rownames(corFA),FUN=function(b) paste(b,rownames(corFA),sep = "-")))
+
+a<-unlist(mapply(FUN=function(a,b) if (!is.na(a)) paste(b,a ),as.numeric(sig),fa2))
+for ( i in a) print(i)
+```
+## This suggests three plots:
+* **%oleic vs %( palmitic, linoleic, palmitoleic )**
+* **%linolenic vs %( arachidic, eicosenoic )**
+* **%palmitoleic vs %( palmitic, linoleic)**  
+  
+using color filled by area and labeled by region abbreviation.
+
+## Map region to region abbreviations so it fits on a map label:
+> This did not show up on plots (too crowded to fit?)
+
+```{r}
+olive <- olive %>%
+  mutate(regionAbbr=
+           if (grepl("North",region)[1]) "NI" # northern Italy
+          else if (grepl("South",region)[1]) "SI" # southern Italy
+          else "Sar" # Sardinia
+  )  
+```
+
+## Model linear regression: **oleic ~  palmitic + linoleic + palmitoleic**
+
+```{r}
+lm<-lm(oleic ~  palmitic + linoleic + palmitoleic, olive)
+summary(lm)
+# create predicted column
+model <- predict(lm,se=TRUE)
+olive <-olive %>%
+  mutate(predicted = model$fit) %>%
+  # set the residual boundary lines at the 96th percentile on either side of the regression line.
+  mutate(upperSe= predicted + 1.96*model$se.fit) %>%
+  mutate(lowerSe= predicted - 1.96*model$se.fit)
+
+```
+
+## Plot 1:
+
+```{r fig1,fig.cap="\\label{fig:fig1}Fatty Acid Content of Italian Olive Oils"}
+# lm<-lm(oleic ~  palmitic + linoleic + palmitoleic, olive)
+plot1<-olive %>%
+  ggplot(aes(y=predicted,
+             x=oleic, 
+             color=area, 
+             labelR=region,
+             labelP1=palmitic,
+             labelP2=palmitoleic,
+             labelL=linoleic
+             )
+        )+
+    theme_classic(base_size = 12)+
+    geom_point()+
+  # plot regression line with standard error:
+    geom_smooth(aes(ymin=lowerSe,ymax=upperSe),
+                color="black",
+                se=TRUE,
+                method = 'loess',
+                formula = 'y ~ x',
+                stat="smooth"
+    )+
+    scale_fill_distiller(palette = "Set2")+
+  theme(
+    plot.title = element_text( size=10, face="plain",lineheight =.8,hjust = .5 ,vjust = 1),
+    axis.title.x = element_text(size=12, face="plain"),
+    legend.title = element_blank()
+)+
+    labs(title="\nOleic Acid ~ Palmitic + Linoleic + Palmitoleic",
+          x="Percentage Oleic Acid",
+          y="Predicted Percentage Oleic Acid"
+    )
+
+
+ggplotly(plot1)
+  
+```
+
+  
+
+## Model linear regression: **%linolenic ~ arachidic +  eicosenoic**
+
+```{r}
+lm<-lm(linolenic ~ arachidic +  eicosenoic, olive)
+summary(lm)
+# create predicted column
+
+model <- predict(lm,se=TRUE)
+olive <-olive %>%
+  mutate(predicted = model$fit) %>%
+  mutate(upperSe= predicted + 1.96*model$se.fit) %>%
+  mutate(lowerSe= predicted - 1.96*model$se.fit)
+```
+
+## Plot 2:
+
+```{r fig2,fig.cap="\\label{fig:fig2}Fatty Acid Content of Italian Olive Oils"}
+plot2<-olive %>%
+  ggplot(aes(y=predicted,
+             x=linolenic, 
+             color=area, 
+             labelR=region,
+             labelP1=arachidic,
+             labelP2=eicosenoic,
+             )
+        )+
+    theme_classic(base_size = 12)+
+    geom_point()+
+  #plot regression line
+  geom_smooth(aes(ymin=lowerSe,ymax=upperSe),
+                color="black",
+                se=TRUE,
+                method = 'loess',
+                formula = 'y ~ x',
+                stat="smooth"
+    )+
+    
+    scale_fill_distiller(palette = "Set2")+
+  theme(
+    plot.title = element_text( size=10, face="plain",lineheight =.8,hjust = .5,vjust = 1),
+    axis.title.x = element_text(size=12, face="plain"),
+    legend.title = element_blank()
+)+
+    labs(title="\nLinolenic Acid ~ arachidic + eicosenoic",
+          x="Percentage Linolenic Acid",
+          y="Predicted Percentage Linolenic Acid"
+    )
+
+ggplotly(plot2)
+  
+```
+
+  
+## Model linear regression:  **%palmitoleic ~ palmitic + linoleic**  
+
+```{r}
+lm<-lm(palmitoleic ~ palmitic + linoleic, olive)
+summary(lm)
+# create predicted column
+
+model <- predict(lm,se=TRUE)
+olive <-olive %>%
+  mutate(predicted = model$fit) %>%
+  mutate(upperSe= predicted + 1.96*model$se.fit) %>%
+  mutate(lowerSe= predicted - 1.96*model$se.fit)
+```
+
+## Plot 3:
+
+```{r fig3,fig.cap="\\label{fig:fig3}Fatty Acid Content of Italian Olive Oils"}
+plot3<-olive %>%
+  ggplot(aes(y=predicted,
+             x=palmitoleic, 
+             color=area, 
+             labelR=region,
+             labelP1=palmitic,
+             labelP2=linoleic
+             )
+        )+
+    theme_classic(base_size = 12)+
+    geom_point()+
+  #plot regression line
+  geom_smooth(aes(ymin=lowerSe,ymax=upperSe),
+                color="black",
+                se=TRUE,
+                method = 'loess',
+                formula = 'y ~ x',
+                stat="smooth"
+    )+
+    
+    scale_fill_distiller(palette = "Set2")+
+  theme(
+    plot.title = element_text( size=10, face="plain",lineheight =.8,hjust = .5,vjust = 1),
+    axis.title.x = element_text(size=12, face="plain"),
+    legend.title = element_blank()
+)+
+    labs(title="\nPalmitoleic ~ palmitic + linoleic",
+          x="Percentage Palmitoleic Acid",
+          y="Predicted Percentage Palmitoleic Acid"
+    )
+
+ggplotly(plot3)
+  
+```
+
+  
