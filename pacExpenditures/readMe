@@ -1,1 +1,28 @@
 more to come someday, sum where
+
+Cleaned data originating from:
+
+## Urls to FEC's PAC independent expenditures
+> for election years 2010-2020
+
+```{r}
+urls<-as.character(c(
+  "https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/bulk-downloads/2010/independent_expenditure_2010.csv",
+  "https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/bulk-downloads/2012/independent_expenditure_2012.csv",
+  "https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/bulk-downloads/2014/independent_expenditure_2014.csv",
+  "https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/bulk-downloads/2016/independent_expenditure_2016.csv",
+  "https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/bulk-downloads/2018/independent_expenditure_2018.csv",
+  "https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/bulk-downloads/2020/independent_expenditure_2020.csv"
+))
+```
+
+
+## Combine all election years
+
+```{r warning=FALSE, message=FALSE}
+expenditure<-read_csv(urls[1])
+
+for ( i in urls[-1] ) {
+  a<-read_csv(i)
+  expenditure<-bind_rows(expenditure,a)
+}
