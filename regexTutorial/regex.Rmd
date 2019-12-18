@@ -1,0 +1,772 @@
+---
+title: "Regular Expressions Tutorial"
+author: "Steve Dutky MC Data110 Fall 2019"
+date: "12/5/2019"
+output: html_document
+---
+
+## - [start](#frame1) {#start}
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,highlight = TRUE)
+```
+## First the dirty work you can ignore for now
+### set the seed for generating repeatable random numbers
+```{r}
+set.seed(19181112)
+```
+
+### load the libraries
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(ggwordcloud)
+
+```
+### A useful function extract matching regular expressions from a character expression or vector
+```{r}
+
+getRegEx<-function(re, v) {
+  # extract all strings matching regular expression re in 
+  # input text or vector v
+  vectorResult<-c() # initialize vector container for matches
+  v<-v[grep(re,v)] # line up the first candidates for macthing
+  
+  while (length(v) >0 ) { # any candidates left?
+    matchStart<-regexpr(re,v)
+    matchEnd<-matchStart+attr(matchStart,"match.length")-1
+    endOfString<-nchar(v)
+    
+    # add matching strings to results
+    vectorResult<-c( vectorResult,
+                     substr(v,matchStart,matchEnd)
+                  )
+    
+    # remove matching strings from candidates
+    v<-paste(substr(v,1,matchStart-1),substr(v,matchEnd+1,endOfString),sep="")
+    v<-v[grep(re,v)]  # line up remaining candidates
+  }
+  
+  return(vectorResult)
+    
+} 
+```
+### return ggwordcloud plot of words, frequency, optional params
+
+```{r}
+require(ggwordcloud)
+
+myGgWordCloud<-function(wordSpec, max_size=24,title="",caption="") {
+#  wordSpec is a tibble with required column names words and frquency
+#    if not specified, columns angle and color will be generated as below
+# max_size is in points, title and caption are usual ggplot args
+if (!("angle" %in% names(wordSpec))) {
+        wordSpec <- wordSpec %>%
+                mutate(angle = 45 * sample(-2:2, n(), replace = TRUE, prob = c(1, 2, 4, 2, 1)))
+}
+
+if (!("color" %in% names(wordSpec))) {
+        wordSpec <- wordSpec %>%
+                mutate(color = factor(sample.int(10, nrow(wordSpec), replace = TRUE)))
+}
+
+plotReturn<-ggplot(
+  wordSpec,
+  aes(
+    label = words, size = frequency,
+    color = color,
+    angle = angle
+  )
+) +
+  geom_text_wordcloud_area(area_corr = TRUE) +
+  scale_size_area(max_size = max_size) +
+  labs(title=title, caption = caption) +
+  theme_set(theme_minimal(base_size = 15))
+  theme_minimal()
+
+return(plotReturn)
+}
+```
+
+### - [next](#frame2) {#frame1}
+''![](https://github.com/sdutky/mcData110/raw/master/regexTutorial/frame1.png)
+
+
+### - [next](#frame3) {#frame2}
+''![](https://github.com/sdutky/mcData110/raw/master/regexTutorial/frame2.png)
+
+### [next](#intro) {#frame3} 
+
+''![](https://github.com/sdutky/mcData110/raw/master/regexTutorial/frame3.png)
+
+### [apologies to Randall Munroe xkcd.com](https://xkcd.com/208/) 
+
+#### [next](#introSetup) {#intro}
+## DATA 110 background:  
+### As part of web scraping we were introduced to the R function **gsub("this", "for that", v)** which replaces all occurences of "this" with "for that" in variable v:
+#### [next](#introEg) {#introSetup}
+```{r}
+richardII<-c(
+    "THIS EXAMPLE from Shakespeare's Richard II:",
+    "",
+    "1050. Gaunt: This royal throne of kings, this sceptred isle,",
+    "This earth of majesty, this seat of Mars,",
+    "This other Eden, demi-paradise,",
+    "This fortress built by Nature for herself",
+    "Against infection and the hand of war,",
+    "1055. This happy breed of men, this little world,",
+    "This precious stone set in the silver sea,",
+    "Which serves it in the office of a wall",
+    "Or as a moat defensive to a house,",
+    "Against the envy of less happier lands,--",
+    "1060. This blessed plot, this earth, this realm, this England.",
+    "<snip>",
+    "Yorke: The King is come, deale mildly with his youth,"
+)  
+```
+#### [next](#regex1) {#introEg}
+```{r} 
+print(gsub("this", "for that", richardII))
+```
+
+#### [next](#regexUses) {#regex1}
+### The first argument "this" is in this case a literal string, but is actually a pattern of literal characters and codes that form **regular expressions**   These form a versatile way of matching, manipulating, and cleaning text.  In the next four minutes we're going to cover some of their basic features and the functions that use them.  
+
+#### [next](#phoneFixupIntro) {#regexUses}
+## And what are regular expressions good for?
+#### [next](#nameFixupIntro) {#phoneFixupIntro}
+### fixing up phone numbers
+
+```{r echo=FALSE}
+tibble(
+        original=c("136-540-1970",
+        "967-469-4943",
+        "515-071-8078",
+        "163.070.3292 1234",
+        "(621) 902-2951 ext 220",
+        "985-954-1652",
+        "668.771.5174",
+        "(418) 915-8969",
+        "3233449931",
+        "835-255-3199"),
+
+        formatted=c("(136) 540-1970",
+        "(967) 469-4943",  
+        "(515) 071-8078",
+        "(163) 070-3292 ext. 1234",
+        "(621) 902-2951 ext. 220",
+        "(985) 954-1652",  
+        "(668) 771-5174",
+        "(418) 915-8969",
+        "(323) 344-9931", 
+        "(835) 255-3199")
+)
+
+```
+ 
+
+#### [next](#textMiningIntro) {#nameFixupIntro}
+### fixing up names
+
+```{r echo=FALSE}
+structure(list(fullName = c("  David       R      Al-Hashimi", 
+"Christopher L      Brown     ", "Davis-Mbali,    Jane              ", 
+"Garcia,   Daniel      S      ", "Jones,    James       D      ", 
+"O'Brien,  Roberta     June      ", "Rodriguez,Brian       C      ", 
+"Smith,    John        M      ", "Thomas,   Joseph      Anthony", 
+"Williams, Michael     A      "), lastName = c("Al-Hashimi", 
+"Brown", "Davis-Mbali", "Garcia", "Jones", "O'Brien", "Rodriguez", 
+"Smith", "Thomas", "Williams"), firstName = c("David", "Christopher", 
+"Jane", "Daniel", "James", "Roberta", "Brian", "John", "Joseph", 
+"Michael"), middleName = c("R", "L", NA, "S", "D", "June", "C", 
+"M", "Anthony", "A")), row.names = c(NA, -10L), class = c("tbl_df", 
+"tbl", "data.frame"))
+
+
+```
+
+#### [next](#wcAllCaps) {#textMiningIntro}
+
+### text mining
+
+#### [next](#wcHandles) {#wcAllCaps}
+
+```{r echo=FALSE}
+load(url("https://github.com/sdutky/mcData110/raw/master/regexTutorial/wcAllCaps.plot"))
+wcAllCaps
+
+```
+
+### -
+#### [next](#wcHashTags) {#wcHandles}
+### -
+
+```{r echo=FALSE}
+load(url("https://github.com/sdutky/mcData110/raw/master/regexTutorial/wcHandles.plot"))
+wcHandles
+
+```
+
+### -
+#### [next](#wcTitleString) {#wcHashTags}
+### -
+
+```{r echo=FALSE}
+load(url("https://github.com/sdutky/mcData110/raw/master/regexTutorial/wcHashTags.plot"))
+wcHashTags
+
+```
+
+### -
+#### [next](#apps) {#wcTitleString}
+### -
+
+```{r echo=FALSE}
+load(url("https://github.com/sdutky/mcData110/raw/master/regexTutorial/wcTitleStrings.plot"))
+wcTitleStrings
+
+```
+  
+#### [next](#regexEssentials) {#apps}
+## Who uses and Where can you use **regular expressions**?
+>   
+* ### The short answer is coders of many apps and languages:
++ ### [R](https://stat.ethz.ch/R-manual/R-devel/library/base/html/regex.html)
++ ### [python](https://docs.python.org/3/library/re.html)
++ ### [java](https://www.vogella.com/tutorials/JavaRegularExpressions/article.html)
++ ### [javascript](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions)
++ ### shell scripts, perl, PowerShell
++ ### [Tableau](https://www.tableau.com/about/blog/2015/6/become-regular-regular-expressions-39802)
++ ### even [Excel](https://medium.com/@jrcharney/excel-vba-regular-expression-functions-800147f64c95) after the usual bending over [backwards](https://stackoverflow.com/questions/22542834/how-to-use-regular-expressions-regex-in-microsoft-excel-both-in-cell-and-loops)
++ ### [Google Search](https://webapps.stackexchange.com/questions/19673/is-there-a-way-to-search-in-google-using-regular-expressions-regex) supports some regular expressions: try (gray|red) (fox|wolf)
+
+#### [next](#regexNamedClasses) {#regexEssentials}
+## Regular Expressions: the essentials:
+
+* **Anchors:**  ^ matches the start of text, $ matches the end,  
+* **Character Classes:**
+  + [string] matches one of characters in string
+  + [a-z]  matches one lowercase letter
+  + [A-Z]  matches one uppercase letter
+  + [0-9]  matches one digit
+  + [^A-Z] matches one character that is not an uppercase letter
+  + [^A-Za-z0-9] matches one character that is not any of these, ie. one punctuation mark.  
+  + . matches any single character
+* **Character Codes: prefixed in R by doubble escapes \\\\ **
+  + \\\\w \\\\W  word/non word characters [A-Z0-9a-z_] / [^A-Z0-9a-z_]
+  + \\\\s \\\\S  whitespace/non whitespace characters [ \\\\r\\\\t\\\\n] / [^ \\\\r\\\\t\\\\n]
+  + \\\\d \\\\D  digit/non digit [0-9] / [^0-9]
+  + \\\\b \\\\B  word boundary / non word boundary
+  + \\\\n \\\\r \\\\f \\\\t  newline, return, formfeed, tab
+* **Quantifiers:**
+  + _regex_* matches regular expression _regex_ 0 or more times 
+  + _regex_? matches regular expression _regex_ 1 or 0 times 
+  + _regex_+ matches _regex_ 1 or more times
+  + _regex_{count} matches regex exactly _count_ times 
+  + _regex_{min,} matches regex at least min times
+  + _regex_{min,max} matches regex at least min times but no more than max
+  + _regex_{,max} matches regex no more than max times
+  
+#### [next](#regexFunctions) {#regexNamedClasses}
+* **Combining & capturing:**
+  + (_regex1_|_regex2_) matches one instance of regex1 or regex2
+  + (_regex_) "captures" _regex_ 
+  + (?:_regex_) non capturing grouping
+  + _\\\\1_ to _\\\\9_  backreferences used to refer to captured _regex_ in replacement
+
+* **Named Character Classes: operate only within brackets**
+  + [:alnum:]   Alphanumeric characters [a-zA-Z0-9]     
+  + [:alpha:]   Alphabetic characters   [a-zA-Z]
+  + [:ascii:]   ASCII characters        [\\\\x00-\\\\x7F]
+  + [:blank:]   Space and tab   [ \\\\t]   
+  + [:cntrl:]   Control characters      [\\\\x00-\\\\x1F\\\\x7F]
+  + [:digit:]   Digits  [0-9]   
+  + [:graph:]   Visible characters      [\\\\x21-\\\\x7E]
+  + [:lower:]   Lowercase letters       [a-z]   
+  + [:print:]   Visible characters and spaces   [\\\\x20-\\\\x7E]
+  + [:punct:]   Punctuation (and symbols) [^A-Za-z0-9 ]        
+  + [:space:]   All whitespace characters, including line breaks
+  + [:upper:]   Uppercase letters       [A-Z]   
+  + [:word:]    Word characters         [A-Za-z0-9_]    
+  + [:xdigit:]      Hexadecimal Digits      [0-9A-Fa-f]
+
+#### [next](#cleanPhones) {#regexFunctions}
+## What can you do with **regular expressions**?
+> **in the simple cases:** 
+
+* ### **grep(** **regex**,**string**,value=FALSE,invert=FALSE)  [example](#grepEg) {#grep}
+    + #### grep is an acronym for "get regular expression"
+    + #### with the default arguments, it returns the indices of string that match regex
+    + #### with invert=TRUE, it returns the indices of string that don't match regex
+    + #### with value=TRUE, it returns the values of string   
+* ### **grepl(** **regex**,**string**)  [example](#greplEg) {#grepl}
+    + #### grep logical, returns a logical vector TRUE wherever string matches regex
+    + #### !grepl returns a logical vector TRUE wherever string does not match regex
+    + #### grepl is particularly useful in filtering a dplyr pipeline
+* ### **sub(** **regex**,**replacement**,**string**)  [example](#subEg) {#sub}
+    + #### returns a string where the first match of regex is changed to replacement
+* ### **gsub(** **regex**,**replacement**,**string**)  [example](#gsubEg) {#gsub}
+    + #### returns a string where all matches of regex are changed to replacement
+* ### **strsplit(** **string**,**regex**)  [example](#strsplitEg) {#strsplit}
+    + #### returns a list the length of string. 
+    + #### each element of the list contains a vector,
+    + #### whose elements are formed by dividing string at the matches of regex
+* ### **matchStart**<-**regexpr(** **regex**,**strings**)  [example](#regexprEg) {#regexpr}
+    + #### **matchStart** is a vector the length of strings
+    + #### whose each element is the index of the first match in the corresponding element of strings,
+    + #### **attr(matchStart,"match.length")** contains the length of the first match in the corresponding element of strings,
+    + #### wherever there is no match, **matchStart** and **attr(matchStart,"match.length")** contain -1.
+
+
+
+
+#### [next](#cleaningNames) {#cleanPhones}
+## Example:  Formatting Phone Numbers   [back](#back1) {#eg1}
+> Everybody has a favorite way of formatting phone numbers.  
+> Let's make these as ( \<area code\> ) \<exchange\> \<line\> ext. \<extension\>
+
+```{r}
+originalPhones<-c("136-540-1970", "967-469-4943", "515-071-8078", "163.070.3292 1234", "(621) 902-2951 ext 220", "985-954-1652", "668.771.5174", "(418) 915-8969", "3233449931", "835-255-3199")
+
+print(c("original phone numbers",originalPhones))
+
+# we do this in two passes. First, let's extract all numbers:
+
+formattedPhones<-sub(
+		"^\\D*(\\d{3})\\D*(\\d{3})\\D*(\\d{4})\\D*(\\d*)$",
+# From the beginning, ignore any non-digits, capture 3 digits then		
+#                     ignore any non-digits, capture 3 digits then		
+#                     ignore any non-digits, capture 4 digits then		
+#                     ignore any non-digits, capture any digits to the end		
+		"(\\1) \\2-\\3 ext. \\4",
+		originalPhones
+		)
+# Second remove the trailing space for all the numbers that have no extension:
+formattedPhones<-sub(" ext\\. $","",formattedPhones)
+# note "\\." to specify period
+
+cat("\n")
+print(c("formatted phone numbers",formattedPhones))
+
+```
+#### [next](#nameCleaningSetUp) {#cleaningNames}
+## Let's clean up a bunch of messy full names and split them into last, first, middle:
+```{r}
+# a function to do that
+nameConvert<-function(fullName) {
+  # function to return tibble with full, first, middle, and last names
+  
+  # initialize tibble for return to function caller
+  xfr<-tibble(fullName="",lastName="",firstName="",middleName="")
+  xfr<-xfr[-1,]  # leaves only the tibble header w/o rows
+  # code continues after internal function definition:
+  
+  getNames<-function(fullName) {
+    # internal function to extract name chunks from fullName
+    if (grepl(",",fullName)) {
+      # name in format last, first middle name/initial
+      # use capture group in parentheses to extract each name
+      # in form  <any white space><name><any white>
+      # swallow the entire fullName from beginning to end.
+      
+      regex="^\\s*([A-Za-z'\\-]+)\\s*,.*$"
+      lastName<-sub(regex,"\\1",fullName)
+      regex="^\\s*[A-Za-z'\\-]+\\s*,\\s*([A-Za-z'\\-]+).*$"
+      firstName<-sub(regex,"\\1",fullName)
+      regex="^\\s*[A-Za-z'\\-]+\\s*,\\s*[A-Za-z'\\-]+\\s*([A-Za-z'\\-]*).*$"
+      middleName<-sub(regex,"\\1",fullName)
+      
+    } else {
+      # name in format , first { optional middle name/initial } last
+      # use capture group in parentheses to extract each name
+      # in form  <any white space><name><any white>
+      # swallow the entire fullName from beginning to end.
+      
+      regex="^\\s*([A-Za-z'\\-]+)\\s*.*$"
+      firstName<-sub(regex,"\\1",fullName)
+      regex="^\\s*[A-Za-z'\\-]+\\s*([A-Za-z'\\-]+).*$"
+      middleName<-sub(regex,"\\1",fullName)
+      regex="^\\s*[A-Za-z'\\-]+\\s*[A-Za-z'\\-]+\\s*([A-Za-z'\\-]*).*$"
+      lastName<-sub(regex,"\\1",fullName)
+      
+      # handle case where no middle name/initial: last misinterpretted as middle
+      if (lastName=="") { lastName<-middleName; middleName<-NA}
+    }
+    
+    if (middleName=="") middleName<-NA
+      
+    return (tibble(  # new row for adding
+      fullName=fullName,
+      lastName=lastName,
+      firstName=firstName,
+      middleName=middleName)
+    )
+  }
+  # use internal function to extract names, then add row to xfr
+  #      there's probably a better way to do this with dplyr and an apply function
+  for ( fullN in fullName ) xfr<-rbind(xfr,getNames(fullN))
+  return(xfr)
+}
+```
+#### [next](#textMining)  {#nameCleaningSetUp}
+
+```{r}
+library(stringr)
+
+myData<-tibble(
+  fullName=c(
+    "Williams, Michael     A      ",
+    "Christopher L      Brown     ",
+    "$Smith,    John        M$      ",
+    "O'Brien,  Roberta     June      ",
+    "Jones,    James       D      ",
+    "Rodriguez,Brian       C.      ",
+    "Davis-Mbali,    JANE              ",
+    "  David       R      Al-Hashimi",
+    "Thomas,   Joseph      Anthony",
+    "Garcia,   Daniel      S      "
+  )#, lastName=NA,firstName=NA,middleName=NA
+)
+
+print("here are the original names:")
+(myData)
+
+myCleanerData<- myData %>%
+  # toss anything that's not a letter or acceptable punctuation
+  # note double escape for whitespace, \\s, and hyphen, \\-
+  # also note that \\s requires optional argument perl=TRUE
+  mutate(fullName=gsub("[^\\sA-Za-z,'\\-]","",fullName,perl = TRUE)) %>%
+  
+  # capitalize first letter of every name using stringr function
+  # note: fix up hack #1 to make O'brien => O'B... and Al-hashimi => Al-H...
+  mutate(fullName=gsub("(['\\-])([A-Za-z])","\\1 \\2",fullName))  %>%
+  mutate(fullName=str_to_title(fullName)) %>%
+  mutate(fullName=gsub("(['\\-])[A-Za-z]","\\1 ",fullName))  %>%
+  # undo fix up: remove space after "'" or "-"
+  mutate(fullName=gsub("(['\\-]) ","\\1",fullName)) 
+  
+# There's probably a better way to do this with dplyr and an apply function:
+#     I wimped out
+
+myCleanData<-nameConvert(myCleanerData$fullName) #extract seperate names
+
+# Let's sort them in alphabetic order by last, first, middle
+myCleanData<- myCleanData %>%
+  arrange( lastName, firstName, middleName )
+
+# and out it goes:
+(myCleanData)
+    
+
+
+```
+
+#### [next](#tweetsClean) {#textMining}
+## Trump's tweets from whistleblower complaint until now..
+### [Get Trump's tweets](http://www.trumptwitterarchive.com/archive) as text:
+
+```{r}
+trumpsTweets.txt<-read_lines(url("https://raw.githubusercontent.com/sdutky/mcData110/master/regexTutorial/trumpTweets12Aug15Dec.txt"))
+
+head(trumpsTweets.txt)
+
+```
+
+#### [next](#tweetsDplyr) {#tweetsClean}
+## We can see this follows the form:
+    > **<date>**  
+    > **<text> [<source>]**  
+  
+## Let's extract the dates and times:  
+```{r}
+dateTimeIndex<-grep("..-..-2019 ..:..:[0-9]{2}$",trumpsTweets.txt)
+```
+
+## Let's break down the regular expression \"..-..-2019 ..:..:[0-9]{2}\$\"  
+> **\$** => look for lines ending with  
+> **..-..** => two groups of two characters seperated by a hyphen  
+> **2019** => literal **2019** followed by a space that is followed by  
+> **..:** =>  any two characters followed by a colon followed by  
+> **..:** =>  another any two characters followed by a colon and  
+> **[0-9]{2}\$** => exactly two digits followed by an end of line  
+
+## If we look at dateTimeIndex we can see it's all odd numbers, and we can see that dateTimeIndex+1 is all even numbers:
+```{r}
+cat("\nhead(dateTimeIndex):\n")
+head(dateTimeIndex)
+cat("\nhead(dateTimeIndex+1):\n")
+head(dateTimeIndex+1)
+
+# and the dates and text
+
+cat("\nhead(trumpsTweets.txt[dateTimeIndex]):\n")
+head(trumpsTweets.txt[dateTimeIndex])
+cat("\nhead(trumpsTweets.txt[dateTimeIndex+1]):\n")
+head(trumpsTweets.txt[dateTimeIndex+1])
+```
+
+## So let's make a tibble. We're also going make a place holder for retweets 
+
+```{r}
+trumpsTweets.tib<-tibble(
+  date=trumpsTweets.txt[dateTimeIndex],
+  tweet=trumpsTweets.txt[dateTimeIndex+1],
+  retweetFrom=NA
+)  
+
+str(trumpsTweets.tib)
+```
+#### [next](#twittersphere) {#tweetsDplyr}
+## Now we can start using dplyr to do more:
+> We're going to convert the dates to R's favorite format 
+> Note the use of capturing parenthese and back references
+
+```{r}
+trumpsTweets.tib<- trumpsTweets.tib %>%
+  mutate(
+    date=parse_date_time(date,"%m-%d-%YHMS",tz="EST"),
+    
+    source=sub("^.*[[]([^]]*)[]] *$","\\1",tweet),
+    tweet=sub("[[][^]]*[]] *$","",tweet),
+    #  We're looking to get <source> from [<source>], so:
+    #    find an open bracket then capture as many characters as possible
+    #    that are not a close bracket, followed by a close bracket and
+    #    any number of spaces at the end of the tweet.
+    #    and put it into \\1 for a back reference replacement
+    
+    # isolate retweets, but keep the tweeter's handle
+    retweetFrom=sub("^(?:RT (@[^:]+))*.*$","\\1",tweet),
+    tweet=sub("^(?:RT @[^:]+: )","",tweet),
+    
+    #get rid of urls: either http or https followed by
+    # :// followed by anything up to a space or end of tweet:
+    tweet=gsub("http[s]*://.*( |$)","",tweet)
+    
+  )
+    
+```
+#### [next](#hashTags) {#twittersphere}
+## At this point we want to look at three pieces of Trump's own twittersphere:
+
+* Twitter handles of others including retweets,
+* Inclusion of hash tags,
+* phrase where the first letter of each word is capitalized,
+* And phrases in all caps optionally followed by !
+
+
+#### [next](#handles) {#hashTags}
+## Now we can start dissecting trumps tweets
+### First get the hashtags: #alphanumeric and/or underscores
+```{r}
+hashTags<-getRegEx("#[A-Za-z0-9_]+",trumpsTweets.tib$tweet)
+
+# get the frequency of occurence in descending order
+htTable<-sort( table(hashTags), decreasing = TRUE)
+hashTags.tib<-tibble(
+                words=names(htTable),
+                frequency=htTable
+                )
+hashTags.tib
+```
+### Now plot the word cloud of hash tags:
+
+```{r}
+a<-hashTags.tib[1:50,]
+a$frequency<-log(a$frequency)
+
+wcHashTags<-myGgWordCloud(a,title="top 50 hash tags in trump tweets 2019 12 Aug - 15 Dec",max_size = 8)
+wcHashTags
+
+```
+
+#### [next](#allCaps) {#handles}
+### Now get the twitter handles: @alphanumeric and/or underscores; add in the retweeters, sort and tibblelize them:
+
+```{r}
+handles<-getRegEx("@[A-Za-z0-9_]+",trumpsTweets.tib$tweet)
+
+handles<-c( handles, trumpsTweets.tib$retweetFrom[trumpsTweets.tib$retweetFrom!=""])
+
+hanTable<-sort(table(handles),decreasing  =TRUE)
+
+handles.tib<-tibble(
+                words=names(hanTable),
+                frequency=hanTable
+                )
+handles.tib
+```
+### Plot the top 20 twitter handles in Trump's tweets
+
+```{r}
+# since Trump includes @realDonaldTrump more than anybody else,
+# we will convert frequency to log(frequency)
+a<-handles.tib[1:20,]
+a$frequency<-log(a$frequency)
+
+wcHandles<-myGgWordCloud(a,title="top 20 handles in trump tweets 2019 12 Aug - 15 Dec",max_size = 8)
+wcHandles
+```
+
+
+#### [next](#titleStrings)  {#allCaps}
+### And the all-in-caps phrases:
+* "[A-Z']+ " => first word followed by a space
+* "(?:[A-Z.']+( |!|$)){2,} => at least two more words followed by either a space, exclamation point or end of line.
+
+```{r}
+allCaps<-getRegEx("[A-Z']+ (?:[A-Z.']+( |!|$)){2,}",trumpsTweets.tib$tweet)
+
+allCapsTable<-sort(table(allCaps), decreasing = TRUE)
+
+allCaps.tib<-tibble(
+                words=names(allCapsTable),
+                frequency=allCapsTable
+                )
+allCaps.tib
+```
+### Plot Trumps All Caps Phrases 
+
+```{r}
+a<-allCaps.tib[1:20,]
+a$angle<-0  # display all phrases horizontally
+
+wcAllCaps<-myGgWordCloud(a,title="top 20 all caps in trump tweets 2019 12 Aug - 15 Dec",max_size = 8)
+wcAllCaps
+
+```
+
+#### [top](#toc) {#titleStrings}
+### Title Strings: first letter of each word capitalized 
+
+```{r}
+
+titleStrings<-getRegEx("[A-Z][a-z]+ (?:[A-Z][a-z]+( |!|$)){2,}",trumpsTweets.tib$tweet)
+
+# remove beginning The's
+titleStrings<-gsub("^The ","",titleStrings)
+
+titleTable<-sort(table(titleStrings),decreasing = TRUE)
+
+titleStrings.tib<-tibble(
+                    words=names(titleTable),
+                    frequency=titleTable
+                  )
+titleStrings.tib
+```
+### Plot the top 20 title strings:
+
+```{r}
+a<-titleStrings.tib[1:20,]
+a$frequency<-log(a$frequency)
+a$angle<-0  # display all phrase horizontally
+
+wcTitleStrings<-myGgWordCloud(a,title="top 20 title strings in trump tweets 2019 12 Aug - 15 Dec",max_size = 8)
+wcTitleStrings
+
+```
+
+* 
+### **grep(** **regex**,**string**,value=FALSE,invert=FALSE)  [back](#grep) {#grepEg}
+* 
+    + #### grep is an acronym for "get regular expression"
+    + #### with the default arguments, it returns the indices of string that match regex
+    + #### with invert=TRUE, it returns the indices of string that don't match regex
+    + #### with value=TRUE, it returns the values of string   
+    
+```{r}
+richardII
+```
+```{r}
+# look for literal string "ess"
+grep("ess",richardII)
+richardII[grep("ess",richardII)]
+```
+```{r}
+# look for commas in the middle
+grep("[a-z], [a-z]",richardII)
+richardII[grep("[a-z], [a-z]",richardII)]
+```
+```{r}
+# look for capital letters not at the beginning
+grep(".[A-Z]",richardII)
+richardII[grep(".[A-Z]",richardII)]
+```
+### Look for lines that begin with one or more digits and return their values
+```{r}
+grep("^\\d+",richardII,value = TRUE)
+```
+    
+### **grepl(** **regex**,**string**)  [back](#grepl) {#greplEg}
+* 
+    + #### grep logical, returns a logical vector TRUE wherever string matches regex
+    + #### !grepl returns a logical vector TRUE wherever string does not match regex
+    + #### grepl is particularly useful in filtering a dplyr pipeline
+```{r}
+# make richardII a tibble and pipe it to a filter:
+tibble(text=richardII) %>%
+  filter(grepl(".[A-Z]",text)) # still looking for uppercase in the middle
+```
+    
+### **sub(** **regex**,**replacement**,**string**)  [back](#sub) {#subEg}
+* 
+    + #### returns a string where the first match of regex is changed to replacement
+    
+```{r}
+sub("blessed","darned",richardII)[13]
+
+# capture and backreference
+sub("this ([A-Z][a-z]*)","\\1's fair and pleasant land",richardII)[13]
+```
+### and with dplyr:
+```{r}
+# make richardII a tibble and pipe it to a filter:
+tibble(text=richardII) %>%
+# let's look for characters in the scene with dialog
+  filter(grepl("[A-Z][a-z]+:",text)) %>%
+  # from beginning to end capture the first alphabetic string starting with an uppercase letter up to a colon and discard the rest
+  mutate(character=sub("^[^A-Z]*([A-Z][a-z]+):.*$","\\1",text))
+
+```
+```
+
+### **gsub(** **regex**,**replacement**,**string**)  [back](#gsub) {#gsubEg}
+* 
+    + #### returns a string where all matches of regex are changed to replacement
+    
+```{r}
+# flip the words on either side of "of"
+of<-grep("of",value=TRUE,richardII) #get the line containing "of"
+gsub("([A-Za-z]*) of ([A-Za-z]*)","\\2 of \\1",of)
+```
+    
+### **strsplit(** **string**,**regex**)  [back](#strsplit) {#strsplitEg}
+* 
+    + #### returns a list the length of string. 
+    + #### each element of the list contains a vector,
+    + #### whose elements are formed by dividing string at the matches of regex
+    
+```{r}
+# split the up the phases bounded by non space punctuation
+strsplit(richardII,"[^A-Za-z0-9 ]+ *")
+```
+    
+### **matchStart**<-**regexpr(** **regex**,**strings**)  [back](#regexpr) {#regexprEg}
+* 
+    + #### **matchStart** is a vector the length of strings
+    + #### whose each element is the index of the first match in the corresponding element of strings,
+    + #### **attr(matchStart,"match.length")** contains the length of the first match in the corresponding element of strings,
+    + #### wherever there is no match, **matchStart** and **attr(matchStart,"match.length")** contain -1.
+
+```{r}
+richardII
+```
+```{r}
+# let's get the 2nd through 4th words:
+matchStart<-regexpr(" ([A-Za-z]+[ ,]+){3}",richardII) 
+
+matchEnd<-matchStart+attr(matchStart,"match.length")-1
+substr(richardII,matchStart+1,matchEnd-1)
+
+```
+
