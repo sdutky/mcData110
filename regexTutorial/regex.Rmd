@@ -5,11 +5,60 @@ date: "12/5/2019"
 output: html_document
 ---
 
-## - [start](#frame1) {#start}
+### The [Rmd](https://github.com/sdutky/mcData110/raw/master/regexTutorial/regex.Rmd) and data files can be found on GitHub under https://github.com/sdutky/mcData110/tree/master/regexTutorial.  
+## - [start](#frame1) [toc](#toc) {#start}
+
+### **Contents**  {#toc}  
+* #### [**First the dirty work you can ignore for now**](#initialization)  
+* #### [**A function to extract regular expressions**](#getRegEx)  
+* #### [**A function to generate and return a ggwordcloud**](#myGgWordCloud)  
+* #### [**The power of Regular Expressions**](#frame1)  
+* #### [**What we have seen so far**](#intro)  
+* #### [**Introductory Set Up**](#introSetup)  
+* #### [**Introductory Example**](#introEg)  
+* #### [**A literal string: the most basic regular expression**](#regex1)  
+* #### [**What are regular expressions good for?**](#regexUses)  
+* #### [**Fixing up phone numbers**](#phoneFixupIntro)  
+* #### [**Fixing up names**](#nameFixupIntro)  
+* #### [**Mining Text**](#textMiningIntro)  
+* #### [**TRUMP'S TWEETS!**](#wcAllCaps)  
+* #### [**@realDonaldTrump**](#wcHandles)  
+* #### [**#MAGA**](#wcHashTags)  
+* #### [**Trump's Tweets!**](#wcTitleString)  
+* #### [**Who uses and Where can you use **regular expressions**?**](#apps)  
+* #### [**Regular Expressions: the essentials:**](#regexEssentials)  
+* #### [**Combining & capturing**](#regexNamedClasses)  
+* #### [**What can you do with **regular expressions**?**](#regexFunctions)  
+* #### [**grep - "get regular expression"**](#grep)  
+* #### [**grep example**](#grepEg)  
+* #### [**grep logical**](#grepl)  
+* #### [**grepl example**](#greplEg)  
+* #### [**sub replace the first match**](#sub)  
+* #### [**sub example**](#subEg)  
+* #### [**gsub replace every match**](#gsub)  
+* #### [**gsub example**](#gsubEg)  
+* #### [**strsplit break a string into a list of vectors**](#strsplit)  
+* #### [**strsplit example**](#strsplitEg)  
+* #### [**regexpr find the location of the first matches in a vector strings**](#regexpr)  
+* #### [**regexpr example**](#regexprEg)  
+* #### [**## Example: Formatting Phone Numbers**](#cleanPhones)  
+* #### [**Involved Example: clean up a bunch of messy names**](#cleaningNames)  
+* #### [**Set up for cleaning names**](#nameCleaningSetUp)  
+* #### [**Mining Trump's Tweets**](#textMining)  
+* #### [**Cleaning Trump's Tweets**](#tweetsClean)  
+* #### [**Tibblelizing Trump's Tweets**](#tweetsDplyr)  
+* #### [**The interesting features of Trump's Tweets**](#twittersphere)  
+* #### [**Extracting the HashTags**](#hashTags)  
+* #### [**Extracting the Twitter Handles**](#handles)  
+* #### [**EXTRACTING THE SHOUTS!**](#allCaps)  
+* #### [**Extracting Slogans, Names, and Dogwhistles**](#titleStrings)  
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,highlight = TRUE)
 ```
+#### -
+ >  [toc](#toc) {#initialization}  
+  
 ## First the dirty work you can ignore for now
 ### set the seed for generating repeatable random numbers
 ```{r}
@@ -24,6 +73,9 @@ library(ggplot2)
 library(ggwordcloud)
 
 ```
+
+#### -
+  [toc](#toc) {#getRegEx}  
 ### A useful function extract matching regular expressions from a character expression or vector
 ```{r}
 
@@ -52,6 +104,7 @@ getRegEx<-function(re, v) {
     
 } 
 ```
+  [toc](#toc) {#myGgWordCloud}  
 ### return ggwordcloud plot of words, frequency, optional params
 
 ```{r}
@@ -89,23 +142,23 @@ return(plotReturn)
 }
 ```
 
-### - [next](#frame2) {#frame1}
+### - [next](#frame2) [toc](#toc) [init](#initialization) {#frame1}
 ''![](https://github.com/sdutky/mcData110/raw/master/regexTutorial/frame1.png)
 
 
-### - [next](#frame3) {#frame2}
+### - [next](#frame3) [toc](#toc) {#frame2}
 ''![](https://github.com/sdutky/mcData110/raw/master/regexTutorial/frame2.png)
 
-### [next](#intro) {#frame3} 
+### [next](#intro) [toc](#toc) {#frame3} 
 
 ''![](https://github.com/sdutky/mcData110/raw/master/regexTutorial/frame3.png)
 
 ### [apologies to Randall Munroe xkcd.com](https://xkcd.com/208/) 
 
-#### [next](#introSetup) {#intro}
+#### [next](#introSetup) [toc](#toc) {#intro}
 ## DATA 110 background:  
 ### As part of web scraping we were introduced to the R function **gsub("this", "for that", v)** which replaces all occurences of "this" with "for that" in variable v:
-#### [next](#introEg) {#introSetup}
+#### [next](#introEg) [toc](#toc) {#introSetup}
 ```{r}
 richardII<-c(
     "THIS EXAMPLE from Shakespeare's Richard II:",
@@ -125,17 +178,17 @@ richardII<-c(
     "Yorke: The King is come, deale mildly with his youth,"
 )  
 ```
-#### [next](#regex1) {#introEg}
+#### [next](#regex1) [toc](#toc) {#introEg}
 ```{r} 
 print(gsub("this", "for that", richardII))
 ```
 
-#### [next](#regexUses) {#regex1}
+#### [next](#regexUses) [toc](#toc) {#regex1}
 ### The first argument "this" is in this case a literal string, but is actually a pattern of literal characters and codes that form **regular expressions**   These form a versatile way of matching, manipulating, and cleaning text.  In the next four minutes we're going to cover some of their basic features and the functions that use them.  
 
-#### [next](#phoneFixupIntro) {#regexUses}
+#### [next](#phoneFixupIntro) [toc](#toc) {#regexUses}
 ## And what are regular expressions good for?
-#### [next](#nameFixupIntro) {#phoneFixupIntro}
+#### [next](#nameFixupIntro) [toc](#toc) {#phoneFixupIntro}
 ### fixing up phone numbers
 
 ```{r echo=FALSE}
@@ -166,7 +219,7 @@ tibble(
 ```
  
 
-#### [next](#textMiningIntro) {#nameFixupIntro}
+#### [next](#textMiningIntro) [toc](#toc) {#nameFixupIntro}
 ### fixing up names
 
 ```{r echo=FALSE}
@@ -186,11 +239,15 @@ structure(list(fullName = c("  David       R      Al-Hashimi",
 
 ```
 
-#### [next](#wcAllCaps) {#textMiningIntro}
+#### [next](#wcAllCaps) [toc](#toc) {#textMiningIntro}
 
 ### text mining
+#### The following plots were generated by downloading President Donald J. Trump's tweets from the [Trump Twitter Archive](http://www.trumptwitterarchive.com/archive). ( copied to [GitHub](https://github.com/sdutky/mcData110/raw/master/regexTutorial/trumpTweets12Aug15Dec.txt) ).  The 3,810 tweets span the period from Aug 12, 2019 (date of the whistleblower's complaint through Dec 15, 2019.  
+#### -  
+#### The plots that follow were generated by using regular expressions, first, to assemble the text into a manageable format, and then by using them to extract interesting features from the text.  The ggwordcloud library was used to create the plots.
 
-#### [next](#wcHandles) {#wcAllCaps}
+
+#### [next](#wcHandles) [toc](#toc) {#wcAllCaps}
 
 ```{r echo=FALSE}
 load(url("https://github.com/sdutky/mcData110/raw/master/regexTutorial/wcAllCaps.plot"))
@@ -199,7 +256,7 @@ wcAllCaps
 ```
 
 ### -
-#### [next](#wcHashTags) {#wcHandles}
+#### [next](#wcHashTags) [toc](#toc) {#wcHandles}
 ### -
 
 ```{r echo=FALSE}
@@ -209,7 +266,7 @@ wcHandles
 ```
 
 ### -
-#### [next](#wcTitleString) {#wcHashTags}
+#### [next](#wcTitleString) [toc](#toc) {#wcHashTags}
 ### -
 
 ```{r echo=FALSE}
@@ -219,7 +276,7 @@ wcHashTags
 ```
 
 ### -
-#### [next](#apps) {#wcTitleString}
+#### [next](#apps) [toc](#toc) {#wcTitleString}
 ### -
 
 ```{r echo=FALSE}
@@ -228,7 +285,7 @@ wcTitleStrings
 
 ```
   
-#### [next](#regexEssentials) {#apps}
+#### [next](#regexEssentials) [toc](#toc) {#apps}
 ## Who uses and Where can you use **regular expressions**?
 >   
 * ### The short answer is coders of many apps and languages:
@@ -241,7 +298,7 @@ wcTitleStrings
 + ### even [Excel](https://medium.com/@jrcharney/excel-vba-regular-expression-functions-800147f64c95) after the usual bending over [backwards](https://stackoverflow.com/questions/22542834/how-to-use-regular-expressions-regex-in-microsoft-excel-both-in-cell-and-loops)
 + ### [Google Search](https://webapps.stackexchange.com/questions/19673/is-there-a-way-to-search-in-google-using-regular-expressions-regex) supports some regular expressions: try (gray|red) (fox|wolf)
 
-#### [next](#regexNamedClasses) {#regexEssentials}
+#### [next](#regexNamedClasses) [toc](#toc) {#regexEssentials}
 ## Regular Expressions: the essentials:
 
 * **Anchors:**  ^ matches the start of text, $ matches the end,  
@@ -268,7 +325,7 @@ wcTitleStrings
   + _regex_{min,max} matches regex at least min times but no more than max
   + _regex_{,max} matches regex no more than max times
   
-#### [next](#regexFunctions) {#regexNamedClasses}
+#### [next](#regexFunctions) [toc](#toc) {#regexNamedClasses}
 * **Combining & capturing:**
   + (_regex1_|_regex2_) matches one instance of regex1 or regex2
   + (_regex_) "captures" _regex_ 
@@ -291,28 +348,28 @@ wcTitleStrings
   + [:word:]    Word characters         [A-Za-z0-9_]    
   + [:xdigit:]      Hexadecimal Digits      [0-9A-Fa-f]
 
-#### [next](#cleanPhones) {#regexFunctions}
+#### [next](#cleanPhones) [toc](#toc) {#regexFunctions}
 ## What can you do with **regular expressions**?
 > **in the simple cases:** 
 
-* ### **grep(** **regex**,**string**,value=FALSE,invert=FALSE)  [example](#grepEg) {#grep}
+* ### **grep(** **regex**,**string**,value=FALSE,invert=FALSE)  [example](#grepEg) [toc](#toc) {#grep}
     + #### grep is an acronym for "get regular expression"
     + #### with the default arguments, it returns the indices of string that match regex
     + #### with invert=TRUE, it returns the indices of string that don't match regex
     + #### with value=TRUE, it returns the values of string   
-* ### **grepl(** **regex**,**string**)  [example](#greplEg) {#grepl}
+* ### **grepl(** **regex**,**string**)  [example](#greplEg) [toc](#toc) {#grepl}
     + #### grep logical, returns a logical vector TRUE wherever string matches regex
     + #### !grepl returns a logical vector TRUE wherever string does not match regex
     + #### grepl is particularly useful in filtering a dplyr pipeline
-* ### **sub(** **regex**,**replacement**,**string**)  [example](#subEg) {#sub}
+* ### **sub(** **regex**,**replacement**,**string**)  [example](#subEg) [toc](#toc) {#sub}
     + #### returns a string where the first match of regex is changed to replacement
-* ### **gsub(** **regex**,**replacement**,**string**)  [example](#gsubEg) {#gsub}
+* ### **gsub(** **regex**,**replacement**,**string**)  [example](#gsubEg) [toc](#toc) {#gsub}
     + #### returns a string where all matches of regex are changed to replacement
-* ### **strsplit(** **string**,**regex**)  [example](#strsplitEg) {#strsplit}
+* ### **strsplit(** **string**,**regex**)  [example](#strsplitEg) [toc](#toc) {#strsplit}
     + #### returns a list the length of string. 
     + #### each element of the list contains a vector,
     + #### whose elements are formed by dividing string at the matches of regex
-* ### **matchStart**<-**regexpr(** **regex**,**strings**)  [example](#regexprEg) {#regexpr}
+* ### **matchStart**<-**regexpr(** **regex**,**strings**)  [example](#regexprEg) [toc](#toc) {#regexpr}
     + #### **matchStart** is a vector the length of strings
     + #### whose each element is the index of the first match in the corresponding element of strings,
     + #### **attr(matchStart,"match.length")** contains the length of the first match in the corresponding element of strings,
@@ -321,8 +378,8 @@ wcTitleStrings
 
 
 
-#### [next](#cleaningNames) {#cleanPhones}
-## Example:  Formatting Phone Numbers   [back](#back1) {#eg1}
+#### [next](#cleaningNames) [toc](#toc) {#cleanPhones}
+## Example:  Formatting Phone Numbers [toc](#toc) {#eg1}
 > Everybody has a favorite way of formatting phone numbers.  
 > Let's make these as ( \<area code\> ) \<exchange\> \<line\> ext. \<extension\>
 
@@ -350,7 +407,7 @@ cat("\n")
 print(c("formatted phone numbers",formattedPhones))
 
 ```
-#### [next](#nameCleaningSetUp) {#cleaningNames}
+#### [next](#nameCleaningSetUp) [toc](#toc) {#cleaningNames}
 ## Let's clean up a bunch of messy full names and split them into last, first, middle:
 ```{r}
 # a function to do that
@@ -409,7 +466,7 @@ nameConvert<-function(fullName) {
   return(xfr)
 }
 ```
-#### [next](#textMining)  {#nameCleaningSetUp}
+#### [next](#textMining)  [toc](#toc) {#nameCleaningSetUp}
 
 ```{r}
 library(stringr)
@@ -462,7 +519,7 @@ myCleanData<- myCleanData %>%
 
 ```
 
-#### [next](#tweetsClean) {#textMining}
+#### [next](#tweetsClean) [toc](#toc) {#textMining}
 ## Trump's tweets from whistleblower complaint until now..
 ### [Get Trump's tweets](http://www.trumptwitterarchive.com/archive) as text:
 
@@ -473,7 +530,7 @@ head(trumpsTweets.txt)
 
 ```
 
-#### [next](#tweetsDplyr) {#tweetsClean}
+#### [next](#tweetsDplyr) [toc](#toc) {#tweetsClean}
 ## We can see this follows the form:
     > **<date>**  
     > **<text> [<source>]**  
@@ -517,7 +574,7 @@ trumpsTweets.tib<-tibble(
 
 str(trumpsTweets.tib)
 ```
-#### [next](#twittersphere) {#tweetsDplyr}
+#### [next](#twittersphere) [toc](#toc) {#tweetsDplyr}
 ## Now we can start using dplyr to do more:
 > We're going to convert the dates to R's favorite format 
 > Note the use of capturing parenthese and back references
@@ -546,7 +603,7 @@ trumpsTweets.tib<- trumpsTweets.tib %>%
   )
     
 ```
-#### [next](#hashTags) {#twittersphere}
+#### [next](#hashTags) [toc](#toc) {#twittersphere}
 ## At this point we want to look at three pieces of Trump's own twittersphere:
 
 * Twitter handles of others including retweets,
@@ -555,7 +612,7 @@ trumpsTweets.tib<- trumpsTweets.tib %>%
 * And phrases in all caps optionally followed by !
 
 
-#### [next](#handles) {#hashTags}
+#### [next](#handles) [toc](#toc) {#hashTags}
 ## Now we can start dissecting trumps tweets
 ### First get the hashtags: #alphanumeric and/or underscores
 ```{r}
@@ -580,7 +637,7 @@ wcHashTags
 
 ```
 
-#### [next](#allCaps) {#handles}
+#### [next](#allCaps) [toc](#toc) {#handles}
 ### Now get the twitter handles: @alphanumeric and/or underscores; add in the retweeters, sort and tibblelize them:
 
 ```{r}
@@ -609,7 +666,7 @@ wcHandles
 ```
 
 
-#### [next](#titleStrings)  {#allCaps}
+#### [next](#titleStrings)  [toc](#toc) {#allCaps}
 ### And the all-in-caps phrases:
 * "[A-Z']+ " => first word followed by a space
 * "(?:[A-Z.']+( |!|$)){2,} => at least two more words followed by either a space, exclamation point or end of line.
@@ -636,7 +693,7 @@ wcAllCaps
 
 ```
 
-#### [top](#toc) {#titleStrings}
+#### [top](#toc) [toc](#toc) {#titleStrings}
 ### Title Strings: first letter of each word capitalized 
 
 ```{r}
@@ -667,7 +724,7 @@ wcTitleStrings
 ```
 
 * 
-### **grep(** **regex**,**string**,value=FALSE,invert=FALSE)  [back](#grep) {#grepEg}
+### **grep(** **regex**,**string**,value=FALSE,invert=FALSE)  [back](#grep) [toc](#toc) {#grepEg}
 * 
     + #### grep is an acronym for "get regular expression"
     + #### with the default arguments, it returns the indices of string that match regex
@@ -697,7 +754,7 @@ richardII[grep(".[A-Z]",richardII)]
 grep("^\\d+",richardII,value = TRUE)
 ```
     
-### **grepl(** **regex**,**string**)  [back](#grepl) {#greplEg}
+### **grepl(** **regex**,**string**)  [back](#grepl) [toc](#toc) {#greplEg}
 * 
     + #### grep logical, returns a logical vector TRUE wherever string matches regex
     + #### !grepl returns a logical vector TRUE wherever string does not match regex
@@ -708,7 +765,7 @@ tibble(text=richardII) %>%
   filter(grepl(".[A-Z]",text)) # still looking for uppercase in the middle
 ```
     
-### **sub(** **regex**,**replacement**,**string**)  [back](#sub) {#subEg}
+### **sub(** **regex**,**replacement**,**string**)  [back](#sub) [toc](#toc) {#subEg}
 * 
     + #### returns a string where the first match of regex is changed to replacement
     
@@ -730,7 +787,7 @@ tibble(text=richardII) %>%
 ```
 ```
 
-### **gsub(** **regex**,**replacement**,**string**)  [back](#gsub) {#gsubEg}
+### **gsub(** **regex**,**replacement**,**string**)  [back](#gsub) [toc](#toc) {#gsubEg}
 * 
     + #### returns a string where all matches of regex are changed to replacement
     
@@ -740,7 +797,7 @@ of<-grep("of",value=TRUE,richardII) #get the line containing "of"
 gsub("([A-Za-z]*) of ([A-Za-z]*)","\\2 of \\1",of)
 ```
     
-### **strsplit(** **string**,**regex**)  [back](#strsplit) {#strsplitEg}
+### **strsplit(** **string**,**regex**)  [back](#strsplit) [toc](#toc) {#strsplitEg}
 * 
     + #### returns a list the length of string. 
     + #### each element of the list contains a vector,
@@ -751,7 +808,7 @@ gsub("([A-Za-z]*) of ([A-Za-z]*)","\\2 of \\1",of)
 strsplit(richardII,"[^A-Za-z0-9 ]+ *")
 ```
     
-### **matchStart**<-**regexpr(** **regex**,**strings**)  [back](#regexpr) {#regexprEg}
+### **matchStart**<-**regexpr(** **regex**,**strings**)  [back](#regexpr) [toc](#toc) {#regexprEg}
 * 
     + #### **matchStart** is a vector the length of strings
     + #### whose each element is the index of the first match in the corresponding element of strings,
